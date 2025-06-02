@@ -1238,7 +1238,8 @@ h5 {
 .nav > li.active > a, .nav > li.active > a:hover, .nav > li.active > a:focus {
     color: #ffffff;
     background-color: var(--active-color);
-    border-radius: 8px;
+    border-left: 4px solid #19aa8d;
+    border-radius: 0px;
 }
 
 .nav > li.active > a i {
@@ -1249,7 +1250,7 @@ h5 {
 .navbar-default .nav > li > a:focus {
     background-color: var(--nav-hover-color);
     color: white;
-    border-radius: 8px;
+    border-radius: 0px;
     opacity: 0.9;
 }
 
@@ -6273,7 +6274,7 @@ code {
     min-height: 48px;
     position: relative;
     clear: both;
-    border-radius: 8px 8px 0 0;
+    border-radius: 2px 2px 0 0;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
@@ -6282,7 +6283,7 @@ code {
     color: inherit;
     padding: 15px 20px 20px 20px;
     border: none;
-    border-radius: 0 0 8px 8px;
+    border-radius: 0 0 2px 2px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
@@ -7323,7 +7324,7 @@ body.mini-navbar.fixed-sidebar .logo-element {
     width: 100%;
     max-width: 380px;
     margin: auto 1rem;
-    border-radius: 0.8rem;
+    border-radius: 2px;
     overflow: hidden;
 }
 
@@ -7394,11 +7395,11 @@ body.mini-navbar.fixed-sidebar .logo-element {
 }
 
 .login-card .captcha-group img {
-    height: 2.5rem;
+    height: 2.9rem;
     cursor: pointer;
-    border-radius: 0.25rem;
+    border-radius: 2px;
     background-color: #fff;
-    padding: 0.25rem;
+    padding: 0rem;
 }
 
 .login-card .input-icon {
