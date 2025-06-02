@@ -206,4 +206,4 @@ Linux 示例：
 
 ---
 
-> **如遇问题，请先检查日志，确保防火墙、端口开放，或至 [GitHub Issues](https://github.com/djylb/nps/issues) 反馈问题。** ✅
+> **如遇问题，请先检查日志，确保防火墙、端口开放，或至 [GitHub Issues](https://github.com/mycoool/nps/issues) 反馈问题。** ✅

@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/djylb/nps/lib/common"
+	"github.com/mycoool/nps/lib/common"
 )
 
 func InitDaemon(f string, runPath string, pidPath string) {

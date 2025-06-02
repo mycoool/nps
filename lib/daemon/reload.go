@@ -10,7 +10,7 @@ import (
 	"syscall"
 
 	"github.com/beego/beego"
-	"github.com/djylb/nps/lib/common"
+	"github.com/mycoool/nps/lib/common"
 )
 
 func init() {

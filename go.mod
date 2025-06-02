@@ -9,7 +9,6 @@ require (
 	github.com/c4milo/unpackit v1.0.0
 	github.com/caddyserver/certmagic v0.23.0
 	github.com/ccding/go-stun v0.1.5
-	github.com/djylb/nps v0.29.12
 	github.com/golang/snappy v1.0.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/kardianos/service v1.2.2

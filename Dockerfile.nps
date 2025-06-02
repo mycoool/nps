@@ -1,7 +1,7 @@
 FROM golang:latest AS builder
-# ARG GOPROXY=direct
-ARG GOPROXY=https://proxy.golang.org
-WORKDIR /go/src/github.com/djylb/nps
+ARG GOPROXY=direct
+#ARG GOPROXY=https://proxy.golang.org
+WORKDIR /go/src/github.com/mycoool/nps
 COPY . .
 RUN go mod edit -go=$(go version | awk '{print $3}' | sed 's/go//') && \
     go mod tidy && \

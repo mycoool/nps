@@ -12,11 +12,11 @@ import (
 	"sync/atomic"
 
 	"github.com/beego/beego"
-	"github.com/djylb/nps/lib/common"
-	"github.com/djylb/nps/lib/crypt"
-	"github.com/djylb/nps/lib/logs"
-	"github.com/djylb/nps/lib/rate"
-	"github.com/djylb/nps/lib/version"
+	"github.com/mycoool/nps/lib/common"
+	"github.com/mycoool/nps/lib/crypt"
+	"github.com/mycoool/nps/lib/logs"
+	"github.com/mycoool/nps/lib/rate"
+	"github.com/mycoool/nps/lib/version"
 )
 
 func NewJsonDb(runPath string) *JsonDb {

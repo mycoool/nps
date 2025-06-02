@@ -1,13 +1,13 @@
 # NPS 内网穿透 (全修)
 
-[![GitHub Stars](https://img.shields.io/github/stars/djylb/nps.svg)](https://github.com/djylb/nps)
-[![GitHub Forks](https://img.shields.io/github/forks/djylb/nps.svg)](https://github.com/djylb/nps)
-[![Release](https://github.com/djylb/nps/workflows/Release/badge.svg)](https://github.com/djylb/nps/actions)
-[![GitHub All Releases](https://img.shields.io/github/downloads/djylb/nps/total)](https://github.com/djylb/nps/releases)
+[![GitHub Stars](https://img.shields.io/github/stars/mycoool/nps.svg)](https://github.com/mycoool/nps)
+[![GitHub Forks](https://img.shields.io/github/forks/mycoool/nps.svg)](https://github.com/mycoool/nps)
+[![Release](https://github.com/mycoool/nps/workflows/Release/badge.svg)](https://github.com/mycoool/nps/actions)
+[![GitHub All Releases](https://img.shields.io/github/downloads/mycoool/nps/total)](https://github.com/mycoool/nps/releases)
 
 > 由于 GitHub 限制浏览器语言为中文（Accept-Language=zh-CN) 访问 *.githubusercontent.com ，图标可能无法正常显示。
 
-- [English](https://github.com/djylb/nps/blob/master/README_en.md)
+- [English](https://github.com/mycoool/nps/blob/master/README_en.md)
 
 ---
 
@@ -17,11 +17,11 @@ NPS 是一款轻量高效的内网穿透代理服务器，支持多种协议（T
 
 由于[NPS](https://github.com/ehang-io/nps)停更已久，本仓库基于 nps 0.26 整合社区更新二次开发而来。
 
-- **提问前请先查阅：**  [文档](https://d-jy.net/docs/nps/) 与 [Issues](https://github.com/djylb/nps/issues)
+- **提问前请先查阅：**  [文档](https://d-jy.net/docs/nps/) 与 [Issues](https://github.com/mycoool/nps/issues)
 - **欢迎参与：**  提交 PR、反馈问题或建议，共同推动项目发展。
 - **讨论交流：**  加入 [Telegram 交流群](https://t.me/npsdev) 与其他用户交流经验。
-- **Android：**  [djylb/npsclient](https://github.com/djylb/npsclient)
-- **OpenWrt：**  [djylb/nps-openwrt](https://github.com/djylb/nps-openwrt)
+- **Android：**  [mycoool/npsclient](https://github.com/mycoool/npsclient)
+- **OpenWrt：**  [mycoool/nps-openwrt](https://github.com/mycoool/nps-openwrt)
 
 ---
 
@@ -45,13 +45,13 @@ NPS 是一款轻量高效的内网穿透代理服务器，支持多种协议（T
 
 更多详细配置请参考 [文档](https://d-jy.net/docs/nps/)（部分内容可能未更新）。
 
-### [Android](https://github.com/djylb/npsclient) | [OpenWrt](https://github.com/djylb/nps-openwrt)
+### [Android](https://github.com/mycoool/npsclient) | [OpenWrt](https://github.com/mycoool/nps-openwrt)
 
 ### Docker 部署
 
 ***DockerHub***： [NPS](https://hub.docker.com/r/duan2001/nps) [NPC](https://hub.docker.com/r/duan2001/npc)
 
-***GHCR***： [NPS](https://github.com/djylb/nps/pkgs/container/nps) [NPC](https://github.com/djylb/nps/pkgs/container/npc)
+***GHCR***： [NPS](https://github.com/mycoool/nps/pkgs/container/nps) [NPC](https://github.com/mycoool/nps/pkgs/container/npc)
 
 > 有真实IP获取需求可配合 [mmproxy](https://github.com/djylb/mmproxy-docker) 使用。例如：SSH
 
@@ -84,7 +84,7 @@ nps update && mv /usr/local/bin/nps /usr/bin/nps && nps restart
 ```
 
 #### Windows
-> Windows 7 用户请使用 old 结尾版本 [64](https://github.com/djylb/nps/releases/latest/download/windows_amd64_server_old.tar.gz) / [32](https://github.com/djylb/nps/releases/latest/download/windows_386_server_old.tar.gz) （需要手动更新）
+> Windows 7 用户请使用 old 结尾版本 [64](https://github.com/mycoool/nps/releases/latest/download/windows_amd64_server_old.tar.gz) / [32](https://github.com/mycoool/nps/releases/latest/download/windows_386_server_old.tar.gz) （需要手动更新）
 ```powershell
 .\nps.exe install
 .\nps.exe start|stop|restart|uninstall
@@ -112,7 +112,7 @@ npc update && mv /usr/local/bin/npc /usr/bin/npc && npc restart
 ```
 
 #### Windows
-> Windows 7 用户请使用 old 结尾版本 [64](https://github.com/djylb/nps/releases/latest/download/windows_amd64_client_old.tar.gz) / [32](https://github.com/djylb/nps/releases/latest/download/windows_386_client_old.tar.gz) （需要手动更新）
+> Windows 7 用户请使用 old 结尾版本 [64](https://github.com/mycoool/nps/releases/latest/download/windows_amd64_client_old.tar.gz) / [32](https://github.com/mycoool/nps/releases/latest/download/windows_386_client_old.tar.gz) （需要手动更新）
 ```powershell
 .\npc.exe install -server="xxx:123,yyy:456" -vkey="xxx,yyy" -type="tls,tcp" -log="off"
 .\npc.exe start|stop|restart|uninstall
@@ -146,7 +146,7 @@ npc update && mv /usr/local/bin/npc /usr/bin/npc && npc restart
 
 - **v0.29.11 (2025-05-27)**
   - 避免每次TLS重新握手
-  - 支持自动申请SSL证书 [#54](https://github.com/djylb/nps/issues/54)
+  - 支持自动申请SSL证书 [#54](https://github.com/mycoool/nps/issues/54)
   - 调整域名转发匹配逻辑
   - 调整掉线检测逻辑
 
@@ -187,7 +187,7 @@ npc update && mv /usr/local/bin/npc /usr/bin/npc && npc restart
 
 - **v0.29.3 (2025-05-20)**
   - 客户端参数缺失端口时使用默认端口
-  - 调整仪表盘显示内容 [#16](https://github.com/djylb/nps/issues/16)
+  - 调整仪表盘显示内容 [#16](https://github.com/mycoool/nps/issues/16)
   - 修复英文翻译错误
 
 - **v0.29.2 (2025-05-19)**
@@ -210,7 +210,7 @@ npc update && mv /usr/local/bin/npc /usr/bin/npc && npc restart
     
 - **v0.29.0 (2025-05-19)**
   - 合并HTTP代理和Socks5代理为混合代理
-  - 美化Web界面 （参考 [#76](https://github.com/djylb/nps/issues/76) 感谢 [arch3rPro](https://github.com/arch3rPro)）
+  - 美化Web界面 （参考 [#76](https://github.com/mycoool/nps/issues/76) 感谢 [arch3rPro](https://github.com/arch3rPro)）
   - 支持明暗主题切换
   - 修复注册验证码校验
   - 优化TCP释放逻辑
@@ -230,10 +230,10 @@ npc update && mv /usr/local/bin/npc /usr/bin/npc && npc restart
   - 延长时间校验窗口
   - 完善服务端日志输出
   - 重写HTTP正向代理
-  - 支持同一端口监听HTTP/Socks5代理 [#56](https://github.com/djylb/nps/issues/56)
+  - 支持同一端口监听HTTP/Socks5代理 [#56](https://github.com/mycoool/nps/issues/56)
 
 - **v0.28.2 (2025-05-15)**
-  - 修复HTTP正向代理 [#75](https://github.com/djylb/nps/issues/75)
+  - 修复HTTP正向代理 [#75](https://github.com/mycoool/nps/issues/75)
 
 - **v0.28.1 (2025-05-15)**
   - 客户端加密校验证书
@@ -244,15 +244,15 @@ npc update && mv /usr/local/bin/npc /usr/bin/npc && npc restart
   - 优化域名解析速度
 
 - **v0.27.0 (2025-05-14)**
-  - 启用隧道添加端口检查 [#74](https://github.com/djylb/nps/issues/74)
+  - 启用隧道添加端口检查 [#74](https://github.com/mycoool/nps/issues/74)
   - NPS添加`secure_mode`选项，开启后不再支持旧版客户端
   - NPC添加`proto_version`选项，如需连接旧版服务器需要配置`-proto_version=0`
   - 重写客户端连接协议，防止探测、重放攻击等 （系统时间需要配置正确，依赖系统时间）
   - 更换哈希算法
   - 增加记录客户端本地IP地址
   - 修复最快IP解析
-  - HTTP正向代理使用相对路径 [#75](https://github.com/djylb/nps/issues/75)
-  - 新增WS、WSS方式连接服务端 [#71](https://github.com/djylb/nps/issues/71)
+  - HTTP正向代理使用相对路径 [#75](https://github.com/mycoool/nps/issues/75)
+  - 新增WS、WSS方式连接服务端 [#71](https://github.com/mycoool/nps/issues/71)
   - 客户端服务器双向认证
   - 允许独立配置连接协议
   - 网页添加命令行提示
@@ -267,14 +267,14 @@ npc update && mv /usr/local/bin/npc /usr/bin/npc && npc restart
   - 文档添加自动翻译
   - 重写日志输出模块
   - 修复日志轮换功能
-  - 修复日志权限问题 [#70](https://github.com/djylb/nps/issues/70)
+  - 修复日志权限问题 [#70](https://github.com/mycoool/nps/issues/70)
   - 更新上游依赖
 
 - **v0.26.54 (2025-05-02)**
   - 更新文档说明
   - 添加弹窗翻译
   - 优化浏览器语言检测
-  - 优化操作逻辑减少操作步骤 [#69](https://github.com/djylb/nps/issues/69)
+  - 优化操作逻辑减少操作步骤 [#69](https://github.com/mycoool/nps/issues/69)
 
 - **v0.26.53 (2025-04-25)**
   - P2P同时转发TCP和UDP端口
@@ -291,23 +291,23 @@ npc update && mv /usr/local/bin/npc /usr/bin/npc && npc restart
 
 - **v0.26.50 (2025-04-19)**
   - 优化P2P探测和连接速度
-  - 隧道编辑页面支持保存为新配置 [#8](https://github.com/djylb/nps/issues/8)
+  - 隧道编辑页面支持保存为新配置 [#8](https://github.com/mycoool/nps/issues/8)
   - 调整页面显示，添加排序支持
 
 - **v0.26.49 (2025-04-18)**
   - vkey添加点击复制
-  - 重写透明代理逻辑 [#59](https://github.com/djylb/nps/issues/59)
+  - 重写透明代理逻辑 [#59](https://github.com/mycoool/nps/issues/59)
   - 修复linux、darwin、freebsd的透明代理
 
 - **v0.26.48 (2025-04-17)**
-  - 添加点击自动复制命令行 [#62](https://github.com/djylb/nps/issues/62)
+  - 添加点击自动复制命令行 [#62](https://github.com/mycoool/nps/issues/62)
   - 密码认证配置内容忽略空行
   - 修复NPS的IPv6自动识别
   - 修复管理页面显示
   - 隧道列表支持端口号排序
   - 重写客户端TLS功能，支持使用type传入tls （已弃用tls_enable）
   - 重写服务端TLS功能，支持TLS端口复用 （已弃用tls_enable）
-  - 客户端支持连接多个服务器 [#9](https://github.com/djylb/nps/issues/9)
+  - 客户端支持连接多个服务器 [#9](https://github.com/mycoool/nps/issues/9)
   - 更新证书随机生成
 
 - **v0.26.47 (2025-04-14)** 
@@ -323,19 +323,19 @@ npc update && mv /usr/local/bin/npc /usr/bin/npc && npc restart
   - 优化写入性能
   - 修复端口复用时连接泄露和并发冲突
   - 清理代码更新相关依赖
-  - 新增OpenWRT仓库 [djylb/nps-openwrt](https://github.com/djylb/nps-openwrt)
+  - 新增OpenWRT仓库 [mycoool/nps-openwrt](https://github.com/mycoool/nps-openwrt)
   - 修复拼写错误
-  - 自动更新[Android](https://github.com/djylb/npsclient)和[OpenWrt](https://github.com/djylb/nps-openwrt)仓库
-  - 自动识别服务器IP [#59](https://github.com/djylb/nps/issues/59)
+  - 自动更新[Android](https://github.com/mycoool/npsclient)和[OpenWrt](https://github.com/mycoool/nps-openwrt)仓库
+  - 自动识别服务器IP [#59](https://github.com/mycoool/nps/issues/59)
   - P2P支持IPv6（需要纯IPv6网络环境）
 
 - **v0.26.45 (2025-04-09)** 
   - 搜索功能匹配不限制大小写
-  - 修复HTTP代理认证头 [#55](https://github.com/djylb/nps/issues/55)
-  - 添加编译架构 [#53](https://github.com/djylb/nps/issues/53)
+  - 修复HTTP代理认证头 [#55](https://github.com/mycoool/nps/issues/55)
+  - 添加编译架构 [#53](https://github.com/mycoool/nps/issues/53)
   - 增加自定义DNS支持非标准系统
-  - 新增安卓客户端 [#53](https://github.com/djylb/nps/issues/53) [djylb/npsclient](https://github.com/djylb/npsclient)
-  - 美化下拉框样式，使用标准JSON保存数据 [#51](https://github.com/djylb/nps/pull/51) (感谢[yhl452493373](https://github.com/yhl452493373))
+  - 新增安卓客户端 [#53](https://github.com/mycoool/nps/issues/53) [mycoool/npsclient](https://github.com/mycoool/npsclient)
+  - 美化下拉框样式，使用标准JSON保存数据 [#51](https://github.com/mycoool/nps/pull/51) (感谢[yhl452493373](https://github.com/yhl452493373))
 
 - **v0.26.44 (2025-03-26)** 
   - 修复客户端超过1000不显示问题
@@ -354,9 +354,9 @@ npc update && mv /usr/local/bin/npc /usr/bin/npc && npc restart
 
 - **v0.26.41 (2025-03-22)** 
   - Docker自动创建NPS默认配置 **（一定要记得改配置）**
-  - 固定管理页面左侧菜单、顶部标题、底部footer [#49](https://github.com/djylb/nps/pull/49)
+  - 固定管理页面左侧菜单、顶部标题、底部footer [#49](https://github.com/mycoool/nps/pull/49)
   - 优化运行速度，减少资源占用
-  - 修复单条隧道流量统计 [#30](https://github.com/djylb/nps/issues/30)
+  - 修复单条隧道流量统计 [#30](https://github.com/mycoool/nps/issues/30)
   - 增强流量统计颗粒度 **（注意：客户端流量是隧道流量出入总和的两倍）**
   - 修复文件模式访问
   - 调整管理页面文件模式显示
@@ -367,12 +367,12 @@ npc update && mv /usr/local/bin/npc /usr/bin/npc && npc restart
   - 修复NPC客户端NAT检测  
 
 - **v0.26.40 (2025-03-21)** 
-  - 前端页面美化 [#47](https://github.com/djylb/nps/pull/47)
+  - 前端页面美化 [#47](https://github.com/mycoool/nps/pull/47)
   - 增加docker支持架构，添加shell支持
-  - 向NPS的docker镜像添加tzdata软件包支持时区配置 [#45](https://github.com/djylb/nps/issues/45)
-  - 私密代理支持通过TLS连接 [#37](https://github.com/djylb/nps/issues/37)
+  - 向NPS的docker镜像添加tzdata软件包支持时区配置 [#45](https://github.com/mycoool/nps/issues/45)
+  - 私密代理支持通过TLS连接 [#37](https://github.com/mycoool/nps/issues/37)
   - docker添加主线分支发布
-  - 修复连接数统计问题 [#48](https://github.com/djylb/nps/issues/48)
+  - 修复连接数统计问题 [#48](https://github.com/mycoool/nps/issues/48)
 
 - **v0.26.39 (2025-03-16)** 
   - 切换包至本仓库
@@ -390,4 +390,4 @@ npc update && mv /usr/local/bin/npc /usr/bin/npc && npc restart
   - 整理仓库代码
   - 优化域名查找算法
 
-更多历史更新记录请参阅项目 [Releases](https://github.com/djylb/nps/releases)
+更多历史更新记录请参阅项目 [Releases](https://github.com/mycoool/nps/releases)

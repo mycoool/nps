@@ -14,7 +14,7 @@ import (
 	"strings"
 
 	"github.com/c4milo/unpackit"
-	"github.com/djylb/nps/lib/common"
+	"github.com/mycoool/nps/lib/common"
 )
 
 // Keep it in sync with the template from service_sysv_linux.go file
@@ -155,7 +155,7 @@ type release struct {
 
 func downloadLatest(bin string) string {
 	// get version
-	data, err := http.Get("https://api.github.com/repos/djylb/nps/releases/latest")
+	data, err := http.Get("https://api.github.com/repos/mycoool/nps/releases/latest")
 	if err != nil {
 		log.Fatal(err.Error())
 	}
@@ -169,7 +169,7 @@ func downloadLatest(bin string) string {
 	fmt.Println("The latest version is", version)
 	filename := runtime.GOOS + "_" + runtime.GOARCH + "_" + bin + ".tar.gz"
 	// download latest package
-	downloadUrl := fmt.Sprintf("https://github.com/djylb/nps/releases/download/%s/%s", version, filename)
+	downloadUrl := fmt.Sprintf("https://github.com/mycoool/nps/releases/download/%s/%s", version, filename)
 	fmt.Println("Downloading package from", downloadUrl)
 	resp, err := http.Get(downloadUrl)
 	if err != nil {

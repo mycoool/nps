@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/djylb/nps/lib/logs"
+	"github.com/mycoool/nps/lib/logs"
 )
 
 func TestPortMux_Close(t *testing.T) {

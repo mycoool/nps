@@ -12,12 +12,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/djylb/nps/lib/common"
-	"github.com/djylb/nps/lib/config"
-	"github.com/djylb/nps/lib/conn"
-	"github.com/djylb/nps/lib/crypt"
-	"github.com/djylb/nps/lib/logs"
-	"github.com/djylb/nps/lib/nps_mux"
+	"github.com/mycoool/nps/lib/common"
+	"github.com/mycoool/nps/lib/config"
+	"github.com/mycoool/nps/lib/conn"
+	"github.com/mycoool/nps/lib/crypt"
+	"github.com/mycoool/nps/lib/logs"
+	"github.com/mycoool/nps/lib/nps_mux"
 	"github.com/xtaci/kcp-go/v5"
 )
 

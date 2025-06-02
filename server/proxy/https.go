@@ -13,12 +13,12 @@ import (
 
 	"github.com/beego/beego"
 	"github.com/caddyserver/certmagic"
-	"github.com/djylb/nps/lib/cache"
-	"github.com/djylb/nps/lib/common"
-	"github.com/djylb/nps/lib/conn"
-	"github.com/djylb/nps/lib/crypt"
-	"github.com/djylb/nps/lib/file"
-	"github.com/djylb/nps/lib/logs"
+	"github.com/mycoool/nps/lib/cache"
+	"github.com/mycoool/nps/lib/common"
+	"github.com/mycoool/nps/lib/conn"
+	"github.com/mycoool/nps/lib/crypt"
+	"github.com/mycoool/nps/lib/file"
+	"github.com/mycoool/nps/lib/logs"
 	"github.com/pkg/errors"
 )
 

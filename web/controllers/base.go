@@ -8,12 +8,12 @@ import (
 	"time"
 
 	"github.com/beego/beego"
-	"github.com/djylb/nps/bridge"
-	"github.com/djylb/nps/lib/common"
-	"github.com/djylb/nps/lib/crypt"
-	"github.com/djylb/nps/lib/file"
-	"github.com/djylb/nps/server"
-	"github.com/djylb/nps/server/connection"
+	"github.com/mycoool/nps/bridge"
+	"github.com/mycoool/nps/lib/common"
+	"github.com/mycoool/nps/lib/crypt"
+	"github.com/mycoool/nps/lib/file"
+	"github.com/mycoool/nps/server"
+	"github.com/mycoool/nps/server/connection"
 )
 
 type BaseController struct {

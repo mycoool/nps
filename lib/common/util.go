@@ -25,8 +25,8 @@ import (
 
 	"github.com/araddon/dateparse"
 	"github.com/beego/beego"
-	"github.com/djylb/nps/lib/logs"
-	"github.com/djylb/nps/lib/version"
+	"github.com/mycoool/nps/lib/logs"
+	"github.com/mycoool/nps/lib/version"
 )
 
 // ExtractHost

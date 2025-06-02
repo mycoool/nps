@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/djylb/nps/lib/rate"
+	"github.com/mycoool/nps/lib/rate"
 	"github.com/pkg/errors"
 )
 

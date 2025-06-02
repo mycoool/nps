@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/djylb/nps/lib/common"
-	"github.com/djylb/nps/lib/crypt"
-	"github.com/djylb/nps/lib/logs"
+	"github.com/mycoool/nps/lib/common"
+	"github.com/mycoool/nps/lib/crypt"
+	"github.com/mycoool/nps/lib/logs"
 	"github.com/pkg/errors"
 )
 

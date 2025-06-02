@@ -5,7 +5,7 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/beego/beego"
-	"github.com/djylb/nps/lib/logs"
+	"github.com/mycoool/nps/lib/logs"
 )
 
 func InitPProfFromFile() {

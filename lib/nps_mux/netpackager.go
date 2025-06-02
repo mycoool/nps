@@ -5,7 +5,7 @@ import (
 	"errors"
 	"io"
 
-	"github.com/djylb/nps/lib/logs"
+	"github.com/mycoool/nps/lib/logs"
 )
 
 type basePackager struct {

@@ -6,8 +6,8 @@ import (
 	"strconv"
 
 	"github.com/beego/beego"
-	"github.com/djylb/nps/lib/logs"
-	"github.com/djylb/nps/lib/pmux"
+	"github.com/mycoool/nps/lib/logs"
+	"github.com/mycoool/nps/lib/pmux"
 )
 
 var pMux *pmux.PortMux

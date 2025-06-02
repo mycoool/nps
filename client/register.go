@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/djylb/nps/lib/common"
+	"github.com/mycoool/nps/lib/common"
 )
 
 func RegisterLocalIp(server string, vKey string, tp string, proxyUrl string, hour int) {

@@ -15,15 +15,15 @@ import (
 	"time"
 
 	"github.com/beego/beego"
-	"github.com/djylb/nps/lib/common"
-	"github.com/djylb/nps/lib/conn"
-	"github.com/djylb/nps/lib/crypt"
-	"github.com/djylb/nps/lib/file"
-	"github.com/djylb/nps/lib/logs"
-	"github.com/djylb/nps/lib/nps_mux"
-	"github.com/djylb/nps/lib/version"
-	"github.com/djylb/nps/server/connection"
-	"github.com/djylb/nps/server/tool"
+	"github.com/mycoool/nps/lib/common"
+	"github.com/mycoool/nps/lib/conn"
+	"github.com/mycoool/nps/lib/crypt"
+	"github.com/mycoool/nps/lib/file"
+	"github.com/mycoool/nps/lib/logs"
+	"github.com/mycoool/nps/lib/nps_mux"
+	"github.com/mycoool/nps/lib/version"
+	"github.com/mycoool/nps/server/connection"
+	"github.com/mycoool/nps/server/tool"
 )
 
 var (

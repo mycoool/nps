@@ -4,10 +4,10 @@
 package proxy
 
 import (
-	"github.com/djylb/nps/lib/common"
-	"github.com/djylb/nps/lib/conn"
-	"github.com/djylb/nps/lib/file"
-	"github.com/djylb/nps/lib/transport"
+	"github.com/mycoool/nps/lib/common"
+	"github.com/mycoool/nps/lib/conn"
+	"github.com/mycoool/nps/lib/file"
+	"github.com/mycoool/nps/lib/transport"
 )
 
 func HandleTrans(c *conn.Conn, s *TunnelModeServer) error {

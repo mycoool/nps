@@ -7,7 +7,7 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/djylb/nps/lib/common"
+	"github.com/mycoool/nps/lib/common"
 )
 
 const (

@@ -13,15 +13,15 @@ import (
 	"time"
 
 	"github.com/ccding/go-stun/stun"
-	"github.com/djylb/nps/client"
-	"github.com/djylb/nps/lib/common"
-	"github.com/djylb/nps/lib/config"
-	"github.com/djylb/nps/lib/crypt"
-	"github.com/djylb/nps/lib/file"
-	"github.com/djylb/nps/lib/install"
-	"github.com/djylb/nps/lib/logs"
-	"github.com/djylb/nps/lib/version"
 	"github.com/kardianos/service"
+	"github.com/mycoool/nps/client"
+	"github.com/mycoool/nps/lib/common"
+	"github.com/mycoool/nps/lib/config"
+	"github.com/mycoool/nps/lib/crypt"
+	"github.com/mycoool/nps/lib/file"
+	"github.com/mycoool/nps/lib/install"
+	"github.com/mycoool/nps/lib/logs"
+	"github.com/mycoool/nps/lib/version"
 )
 
 // 全局配置变量

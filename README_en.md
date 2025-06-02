@@ -1,11 +1,11 @@
 # NPS Intranet Tunneling
 
-[![GitHub stars](https://img.shields.io/github/stars/djylb/nps.svg)](https://github.com/djylb/nps)
-[![GitHub forks](https://img.shields.io/github/forks/djylb/nps.svg)](https://github.com/djylb/nps)
-[![Release](https://github.com/djylb/nps/workflows/Release/badge.svg)](https://github.com/djylb/nps/actions)
-[![GitHub All Releases](https://img.shields.io/github/downloads/djylb/nps/total)](https://github.com/djylb/nps/releases)
+[![GitHub stars](https://img.shields.io/github/stars/mycoool/nps.svg)](https://github.com/mycoool/nps)
+[![GitHub forks](https://img.shields.io/github/forks/mycoool/nps.svg)](https://github.com/mycoool/nps)
+[![Release](https://github.com/mycoool/nps/workflows/Release/badge.svg)](https://github.com/mycoool/nps/actions)
+[![GitHub All Releases](https://img.shields.io/github/downloads/mycoool/nps/total)](https://github.com/mycoool/nps/releases)
 
-- [中文文档](https://github.com/djylb/nps/blob/master/README.md)
+- [中文文档](https://github.com/mycoool/nps/blob/master/README.md)
 
 ---
 
@@ -15,11 +15,11 @@ NPS is a lightweight and efficient intranet tunneling proxy server that supports
 
 Due to the long-term discontinuation of [NPS](https://github.com/ehang-io/nps), this repository is a community-driven, updated fork based on nps 0.26.
 
-- **Before asking questions, please check:** [Documentation](https://d-jy.net/docs/nps/) and [Issues](https://github.com/djylb/nps/issues)
+- **Before asking questions, please check:** [Documentation](https://d-jy.net/docs/nps/) and [Issues](https://github.com/mycoool/nps/issues)
 - **Contributions welcome:** Submit PRs, provide feedback or suggestions, and help drive the project forward.
 - **Join the discussion:** Connect with other users in our [Telegram Group](https://t.me/npsdev).
-- **Android:**  [djylb/npsclient](https://github.com/djylb/npsclient)
-- **OpenWrt:**  [djylb/nps-openwrt](https://github.com/djylb/nps-openwrt)
+- **Android:**  [mycoool/npsclient](https://github.com/mycoool/npsclient)
+- **OpenWrt:**  [mycoool/nps-openwrt](https://github.com/mycoool/nps-openwrt)
 
 ---
 
@@ -43,13 +43,13 @@ Due to the long-term discontinuation of [NPS](https://github.com/ehang-io/nps), 
 
 For more detailed configuration options, please refer to the [Documentation](https://d-jy.net/docs/nps/) (some sections may be outdated).
 
-### [Android](https://github.com/djylb/npsclient) | [OpenWrt](https://github.com/djylb/nps-openwrt)
+### [Android](https://github.com/mycoool/npsclient) | [OpenWrt](https://github.com/mycoool/nps-openwrt)
 
 ### Docker Deployment
 
 **DockerHub:**  [NPS](https://hub.docker.com/r/duan2001/nps) | [NPC](https://hub.docker.com/r/duan2001/npc)
 
-**GHCR:**  [NPS](https://github.com/djylb/nps/pkgs/container/nps) | [NPC](https://github.com/djylb/nps/pkgs/container/npc)
+**GHCR:**  [NPS](https://github.com/mycoool/nps/pkgs/container/nps) | [NPC](https://github.com/mycoool/nps/pkgs/container/npc)
 
 #### NPS Server
 ```bash
@@ -78,7 +78,7 @@ nps start
 ```
 
 #### Windows
-> Windows 7 users should use the version ending with old: [64](https://github.com/djylb/nps/releases/latest/download/windows_amd64_server_old.tar.gz) / [32](https://github.com/djylb/nps/releases/latest/download/windows_386_server_old.tar.gz) (manual updates required)
+> Windows 7 users should use the version ending with old: [64](https://github.com/mycoool/nps/releases/latest/download/windows_amd64_server_old.tar.gz) / [32](https://github.com/mycoool/nps/releases/latest/download/windows_386_server_old.tar.gz) (manual updates required)
 ```powershell
 .\nps.exe install
 .\nps.exe start|stop|restart|uninstall
@@ -104,7 +104,7 @@ npc start
 ```
 
 #### Windows
-> Windows 7 users should use the version ending with old: [64](https://github.com/djylb/nps/releases/latest/download/windows_amd64_client_old.tar.gz) / [32](https://github.com/djylb/nps/releases/latest/download/windows_386_client_old.tar.gz) (manual updates required)
+> Windows 7 users should use the version ending with old: [64](https://github.com/mycoool/nps/releases/latest/download/windows_amd64_client_old.tar.gz) / [32](https://github.com/mycoool/nps/releases/latest/download/windows_386_client_old.tar.gz) (manual updates required)
 ```powershell
 .\npc.exe install -server="xxx:123,yyy:456" -vkey="xxx,yyy" -type="tls,tcp" -log="off"
 .\npc.exe start|stop|restart|uninstall

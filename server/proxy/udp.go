@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/beego/beego"
-	"github.com/djylb/nps/lib/common"
-	"github.com/djylb/nps/lib/conn"
-	"github.com/djylb/nps/lib/file"
-	"github.com/djylb/nps/lib/logs"
+	"github.com/mycoool/nps/lib/common"
+	"github.com/mycoool/nps/lib/conn"
+	"github.com/mycoool/nps/lib/file"
+	"github.com/mycoool/nps/lib/logs"
 )
 
 type UdpModeServer struct {

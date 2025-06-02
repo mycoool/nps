@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/beego/beego"
-	"github.com/djylb/nps/lib/crypt"
+	"github.com/mycoool/nps/lib/crypt"
 )
 
 type AuthController struct {

@@ -3,10 +3,10 @@ package main
 import (
 	"C"
 
-	"github.com/djylb/nps/client"
-	"github.com/djylb/nps/lib/common"
-	"github.com/djylb/nps/lib/logs"
-	"github.com/djylb/nps/lib/version"
+	"github.com/mycoool/nps/client"
+	"github.com/mycoool/nps/lib/common"
+	"github.com/mycoool/nps/lib/logs"
+	"github.com/mycoool/nps/lib/version"
 )
 
 var cl *client.TRPClient

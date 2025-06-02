@@ -1,16 +1,17 @@
 package controllers
 
 import (
-	"github.com/djylb/nps/lib/crypt"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/mycoool/nps/lib/crypt"
+
 	"github.com/beego/beego"
-	"github.com/djylb/nps/lib/common"
-	"github.com/djylb/nps/lib/file"
-	"github.com/djylb/nps/lib/rate"
-	"github.com/djylb/nps/server"
+	"github.com/mycoool/nps/lib/common"
+	"github.com/mycoool/nps/lib/file"
+	"github.com/mycoool/nps/lib/rate"
+	"github.com/mycoool/nps/server"
 )
 
 type ClientController struct {

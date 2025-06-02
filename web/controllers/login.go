@@ -9,10 +9,10 @@ import (
 	"github.com/beego/beego"
 	"github.com/beego/beego/cache"
 	"github.com/beego/beego/utils/captcha"
-	"github.com/djylb/nps/lib/common"
-	"github.com/djylb/nps/lib/crypt"
-	"github.com/djylb/nps/lib/file"
-	"github.com/djylb/nps/server"
+	"github.com/mycoool/nps/lib/common"
+	"github.com/mycoool/nps/lib/crypt"
+	"github.com/mycoool/nps/lib/file"
+	"github.com/mycoool/nps/server"
 )
 
 type LoginController struct {

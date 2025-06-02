@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/brianvoe/gofakeit/v7"
-	"github.com/djylb/nps/lib/logs"
+	"github.com/mycoool/nps/lib/logs"
 )
 
 var (

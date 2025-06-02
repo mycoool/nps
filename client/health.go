@@ -10,10 +10,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/djylb/nps/lib/conn"
-	"github.com/djylb/nps/lib/file"
-	"github.com/djylb/nps/lib/logs"
-	"github.com/djylb/nps/lib/sheap"
+	"github.com/mycoool/nps/lib/conn"
+	"github.com/mycoool/nps/lib/file"
+	"github.com/mycoool/nps/lib/logs"
+	"github.com/mycoool/nps/lib/sheap"
 	"github.com/pkg/errors"
 )
 

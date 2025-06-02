@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/djylb/nps/lib/logs"
+	"github.com/mycoool/nps/lib/logs"
 	"github.com/xtaci/kcp-go/v5"
 )
 

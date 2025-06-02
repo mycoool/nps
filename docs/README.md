@@ -1,9 +1,9 @@
 # NPS
 
-[![GitHub stars](https://img.shields.io/github/stars/djylb/nps.svg)](https://github.com/djylb/nps)
-[![GitHub forks](https://img.shields.io/github/forks/djylb/nps.svg)](https://github.com/djylb/nps)
-[![Release](https://github.com/djylb/nps/workflows/Release/badge.svg)](https://github.com/djylb/nps/actions)
-[![GitHub All Releases](https://img.shields.io/github/downloads/djylb/nps/total)](https://github.com/djylb/nps/releases)
+[![GitHub stars](https://img.shields.io/github/stars/mycoool/nps.svg)](https://github.com/mycoool/nps)
+[![GitHub forks](https://img.shields.io/github/forks/mycoool/nps.svg)](https://github.com/mycoool/nps)
+[![Release](https://github.com/mycoool/nps/workflows/Release/badge.svg)](https://github.com/mycoool/nps/actions)
+[![GitHub All Releases](https://img.shields.io/github/downloads/mycoool/nps/total)](https://github.com/mycoool/nps/releases)
 
 ---
 
@@ -19,7 +19,7 @@ NPS 是一款**轻量级**、**高性能**、**功能强大**的**内网穿透�
 
 ## 背景
 
-![image](https://cdn.jsdelivr.net/gh/djylb/nps/image/web.png)
+![image](https://cdn.jsdelivr.net/gh/mycoool/nps/image/web.png)
 
 ---
 

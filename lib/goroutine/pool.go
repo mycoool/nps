@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/djylb/nps/lib/common"
-	"github.com/djylb/nps/lib/file"
-	"github.com/djylb/nps/lib/logs"
+	"github.com/mycoool/nps/lib/common"
+	"github.com/mycoool/nps/lib/file"
+	"github.com/mycoool/nps/lib/logs"
 	"github.com/panjf2000/ants/v2"
 )
 

@@ -6,8 +6,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/djylb/nps/lib/common"
-	"github.com/djylb/nps/lib/file"
+	"github.com/mycoool/nps/lib/common"
+	"github.com/mycoool/nps/lib/file"
 )
 
 type CommonConfig struct {

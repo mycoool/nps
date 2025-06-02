@@ -83,7 +83,7 @@ npc.exe uninstall
 
 📌 **Windows 客户端退出后自动重启**：
 请按照以下图示配置 Windows 任务计划：
-![image](https://cdn.jsdelivr.net/gh/djylb/nps/docs/windows_client_service_configuration.png)
+![image](https://cdn.jsdelivr.net/gh/mycoool/nps/docs/windows_client_service_configuration.png)
 
 📌 **日志文件位置**：[可通过参数配置](/npc_extend?id=_5-其他命令行参数)
 
@@ -114,7 +114,7 @@ npc.exe uninstall
    npc.exe start  # Windows
    ```
 
-📌 **如果更新失败**，请 **手动下载** [最新版本](https://github.com/djylb/nps/releases/latest)，然后覆盖原有的 `npc` 文件。
+📌 **如果更新失败**，请 **手动下载** [最新版本](https://github.com/mycoool/nps/releases/latest)，然后覆盖原有的 `npc` 文件。
 
 ---
 
@@ -135,7 +135,7 @@ npc.exe uninstall
 ```
 
 📌 **示例配置文件**：
-[📌 示例 `npc.conf`](https://github.com/djylb/nps/tree/master/conf/npc.conf)
+[📌 示例 `npc.conf`](https://github.com/mycoool/nps/tree/master/conf/npc.conf)
 
 #### 全局配置
 
@@ -333,4 +333,4 @@ strip_pre=/web/
 auto_reconnection=true
 ```
 
-✅ **如需更多帮助，请查看 [文档](https://github.com/djylb/nps) 或提交 [GitHub Issues](https://github.com/djylb/nps/issues) 反馈问题。**
+✅ **如需更多帮助，请查看 [文档](https://github.com/mycoool/nps) 或提交 [GitHub Issues](https://github.com/mycoool/nps/issues) 反馈问题。**

@@ -1,4 +1,4 @@
-![logo](https://cdn.jsdelivr.net/gh/djylb/nps/docs/logo.svg)
+![logo](https://cdn.jsdelivr.net/gh/mycoool/nps/docs/logo.svg)
 
 # NPS <small>0.29.12</small>
 
@@ -11,5 +11,5 @@
 - 扩展功能强大
 - 全平台兼容，一键注册为服务
 
-[GitHub](https://github.com/djylb/nps/)
+[GitHub](https://github.com/mycoool/nps/)
 [开始使用](#nps)

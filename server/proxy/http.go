@@ -18,12 +18,12 @@ import (
 
 	"github.com/beego/beego"
 	"github.com/caddyserver/certmagic"
-	"github.com/djylb/nps/lib/common"
-	"github.com/djylb/nps/lib/conn"
-	"github.com/djylb/nps/lib/file"
-	"github.com/djylb/nps/lib/goroutine"
-	"github.com/djylb/nps/lib/logs"
-	"github.com/djylb/nps/server/connection"
+	"github.com/mycoool/nps/lib/common"
+	"github.com/mycoool/nps/lib/conn"
+	"github.com/mycoool/nps/lib/file"
+	"github.com/mycoool/nps/lib/goroutine"
+	"github.com/mycoool/nps/lib/logs"
+	"github.com/mycoool/nps/server/connection"
 )
 
 type httpServer struct {

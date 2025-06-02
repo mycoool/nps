@@ -1,3 +1,3 @@
-* [![GitHub stars](https://img.shields.io/github/stars/djylb/nps.svg?style=social)](https://github.com/djylb/nps)
+* [![GitHub stars](https://img.shields.io/github/stars/mycoool/nps.svg?style=social)](https://github.com/mycoool/nps)
 
-* [![GitHub forks](https://img.shields.io/github/forks/djylb/nps?style=social)](https://github.com/djylb/nps/network)
+* [![GitHub forks](https://img.shields.io/github/forks/mycoool/nps?style=social)](https://github.com/mycoool/nps/network)
