@@ -1,4 +1,4 @@
-module github.com/djylb/nps
+module github.com/mycoool/nps
 
 go 1.24
 
@@ -9,6 +9,7 @@ require (
 	github.com/c4milo/unpackit v1.0.0
 	github.com/caddyserver/certmagic v0.23.0
 	github.com/ccding/go-stun v0.1.5
+	github.com/djylb/nps v0.29.12
 	github.com/golang/snappy v1.0.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/kardianos/service v1.2.2
@@ -54,7 +55,6 @@ require (
 	github.com/tklauser/go-sysconf v0.3.15 // indirect
 	github.com/tklauser/numcpus v0.10.0 // indirect
 	github.com/ulikunitz/xz v0.5.12 // indirect
-	github.com/xtaci/lossyconn v0.0.0-20200209145036-adba10fffc37 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	github.com/zeebo/blake3 v0.2.4 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
