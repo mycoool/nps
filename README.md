@@ -49,7 +49,7 @@ NPS 是一款轻量高效的内网穿透代理服务器，支持多种协议（T
 
 ### Docker 部署
 
-***DockerHub***： [NPS](https://hub.docker.com/r/duan2001/nps) [NPC](https://hub.docker.com/r/duan2001/npc)
+***DockerHub***： [NPS](https://hub.docker.com/r/mycoool/nps) [NPC](https://hub.docker.com/r/mycoool/npc)
 
 ***GHCR***： [NPS](https://github.com/mycoool/nps/pkgs/container/nps) [NPC](https://github.com/mycoool/nps/pkgs/container/npc)
 
@@ -57,14 +57,14 @@ NPS 是一款轻量高效的内网穿透代理服务器，支持多种协议（T
 
 #### NPS 服务端
 ```bash
-docker pull duan2001/nps
-docker run -d --restart=always --name nps --net=host -v $(pwd)/conf:/conf -v /etc/localtime:/etc/localtime:ro duan2001/nps
+docker pull mycoool/nps
+docker run -d --restart=always --name nps --net=host -v $(pwd)/conf:/conf -v /etc/localtime:/etc/localtime:ro mycoool/nps
 ```
 
 #### NPC 客户端
 ```bash
-docker pull duan2001/npc
-docker run -d --restart=always --name npc --net=host duan2001/npc -server=xxx:123,yyy:456 -vkey=key1,key2 -type=tls,tcp -log=off
+docker pull mycoool/npc
+docker run -d --restart=always --name npc --net=host mycoool/npc -server=xxx:123,yyy:456 -vkey=key1,key2 -type=tls,tcp -log=off
 ```
 
 ### 服务端安装
@@ -139,6 +139,10 @@ npc update && mv /usr/local/bin/npc /usr/bin/npc && npc restart
   - 待定，优先修BUG，新功能随缘更新
 
 ### Stable
+
+- **v0.29.16 (2025-06-03)**
+  - 修复DockerHub镜像构建失败
+  - 调整界面配色
 
 - **v0.29.12 (2025-05-28)**
   - 修复指定路径后验证码不显示
