@@ -52,7 +52,7 @@ jobs:
         with:
           context: .
           file: ./Dockerfile.${{ matrix.image }}
-          platforms: linux/amd64 #,linux/arm,linux/arm64,linux/386,linux/ppc64le,linux/s390x
+          platforms: linux/amd64,linux/arm,linux/arm64,linux/386,linux/ppc64le,linux/s390x
           push: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image }}:latest
