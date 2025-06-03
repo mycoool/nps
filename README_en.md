@@ -47,20 +47,20 @@ For more detailed configuration options, please refer to the [Documentation](htt
 
 ### Docker Deployment
 
-**DockerHub:**  [NPS](https://hub.docker.com/r/duan2001/nps) | [NPC](https://hub.docker.com/r/duan2001/npc)
+**DockerHub:**  [NPS](https://hub.docker.com/r/mycoool/nps) | [NPC](https://hub.docker.com/r/mycoool/npc)
 
 **GHCR:**  [NPS](https://github.com/mycoool/nps/pkgs/container/nps) | [NPC](https://github.com/mycoool/nps/pkgs/container/npc)
 
 #### NPS Server
 ```bash
-docker pull duan2001/nps
-docker run -d --restart=always --name nps --net=host -v $(pwd)/conf:/conf -v /etc/localtime:/etc/localtime:ro duan2001/nps
+docker pull mycoool/nps
+docker run -d --restart=always --name nps --net=host -v $(pwd)/conf:/conf -v /etc/localtime:/etc/localtime:ro mycoool/nps
 ```
 
 #### NPC Client
 ```bash
-docker pull duan2001/npc
-docker run -d --restart=always --name npc --net=host duan2001/npc -server=xxx:123,yyy:456 -vkey=key1,key2 -type=tls,tcp -log=off
+docker pull mycoool/npc
+docker run -d --restart=always --name npc --net=host mycoool/npc -server=xxx:123,yyy:456 -vkey=key1,key2 -type=tls,tcp -log=off
 ```
 
 ### Server Installation
