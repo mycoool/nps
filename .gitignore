@@ -2,3 +2,5 @@
 nps
 npc
 .vscode/
+/conf/*.json
+/bin/
