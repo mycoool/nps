@@ -4,3 +4,4 @@ npc
 .vscode/
 /conf/*.json
 /bin/
+/test/
