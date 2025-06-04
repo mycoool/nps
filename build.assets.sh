@@ -93,7 +93,7 @@ build_sdk() {
     local ext=""
     [ "$os" = "windows" ] && ext=".dll" || ext=".so"
     CGO_ENABLED=1 GOOS=$os GOARCH=$arch CC=$cc \
-      go build -buildmode=c-shared -ldflags "$COMMON_LDFLAGS" -o "$folder/npc_sdk$ext" cmd/npc/sdk.go
+      go build -buildmode=c-shared -ldflags "$COMMON_LDFLAGS" -o "$folder/npc_sdk$ext" cmd/sdk/sdk.go
     cp npc_sdk.h "$folder"/ 2>/dev/null || true
   done
   tar -czvf npc_sdk.tar.gz sdk_*
