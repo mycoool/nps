@@ -528,7 +528,6 @@ func (mgr *P2PManager) handleUdpMonitor(cfg *config.CommonConfig, l *config.Loca
 				mgr.mu.Unlock()
 				notReadyRetry++
 			}
-
 			if errV6 == nil {
 				mgr.newUdpConn(tmpConnV6.LocalAddr().String(), cfg, l)
 				mgr.mu.Lock()
@@ -539,7 +538,6 @@ func (mgr *P2PManager) handleUdpMonitor(cfg *config.CommonConfig, l *config.Loca
 				mgr.mu.Unlock()
 				notReadyRetry++
 			}
-
 			time.Sleep(50 * time.Millisecond)
 		}
 
