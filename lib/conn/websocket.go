@@ -3,12 +3,12 @@ package conn
 import (
 	"context"
 	"crypto/tls"
-	"github.com/djylb/nps/lib/common"
 	"io"
 	"net"
 	"net/http"
 	"time"
 
+	"github.com/djylb/nps/lib/common"
 	"github.com/gorilla/websocket"
 )
 
