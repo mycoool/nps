@@ -14,6 +14,7 @@ import (
 	"github.com/beego/beego"
 	"github.com/djylb/nps/bridge"
 	"github.com/djylb/nps/lib/common"
+	"github.com/djylb/nps/lib/conn"
 	"github.com/djylb/nps/lib/file"
 	"github.com/djylb/nps/lib/index"
 	"github.com/djylb/nps/lib/logs"
@@ -173,6 +174,23 @@ func dealClientFlow() {
 			dealClientData()
 		}
 	}
+}
+
+func PingClient(id int, addr string) int {
+	if id <= 0 {
+		return 0
+	}
+	link := conn.NewLink("ping", "", false, false, addr, false)
+	link.Option.NeedAck = true
+	start := time.Now()
+	target, err := Bridge.SendLinkInfo(id, link, nil)
+	if err != nil {
+		logs.Warn("get connection from client Id %d error %v", id, err)
+		return -1
+	}
+	rtt := int(time.Since(start).Milliseconds())
+	_ = target.Close()
+	return rtt
 }
 
 // NewMode new a server by mode name

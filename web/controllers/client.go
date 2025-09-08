@@ -85,6 +85,20 @@ func (s *ClientController) Add() {
 		s.AjaxOkWithId("add success", id)
 	}
 }
+
+func (s *ClientController) PingClient() {
+	id := s.GetIntNoErr("id")
+	data := make(map[string]interface{})
+	if _, err := file.GetDb().GetClient(id); err != nil {
+		data["code"] = 0
+	} else {
+		data["code"] = 1
+		data["rtt"] = server.PingClient(id, s.Ctx.Request.RemoteAddr)
+	}
+	s.Data["json"] = data
+	s.ServeJSON()
+}
+
 func (s *ClientController) GetClient() {
 	if s.Ctx.Request.Method == "POST" {
 		id := s.GetIntNoErr("id")

@@ -419,6 +419,7 @@ func (s *TRPClient) handleChan(src net.Conn) {
 	}
 	//host for target processing
 	if lk.Host == "" {
+		logs.Trace("new %s connection, remote address:%s", lk.ConnType, lk.RemoteAddr)
 		_ = src.Close()
 		return
 	}
