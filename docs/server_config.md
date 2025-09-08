@@ -80,6 +80,9 @@ nps.exe -conf_path=D:\test\nps
 | `bridge_tls_ip`             | 客户端与服务端通信 TLS 监听IP（可选，只有和 `bridge_ip` 不一样时才需要配置）                                        |
 | `bridge_ws_ip`              | 客户端与服务端通信 WS 监听IP（可选，只有和 `bridge_ip` 不一样时才需要配置）                                         |
 | `bridge_wss_ip`             | 客户端与服务端通信 WSS 监听IP（可选，只有和 `bridge_ip` 不一样时才需要配置）                                        |
+| `bridge_path`               | 客户端与服务端通信 WS 的监听路径                                                                      |
+| `bridge_real_ip_header`     | 客户端与服务端通信 WS 获取真实IP的请求头                                                                 |
+| `bridge_trusted_ips`        | 客户端与服务端通信 WS 获取真实IP信任的代理IP列表                                                            |
 | `bridge_host`               | 客户端与服务端通信域名 （端口复用时使用）                                                                   |
 | `bridge_cert_file`          | 客户端与服务端通信 TLS 证书文件路径                                                                    |
 | `bridge_key_file`           | 客户端与服务端通信 TLS 证书密钥文件路径                                                                  |
