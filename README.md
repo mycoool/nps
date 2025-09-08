@@ -143,6 +143,7 @@ npc update && npc restart
   - 调整P2P重试逻辑
   - 支持WS获取真实IP
   - 更新相关依赖包
+  - 升级GO至1.25
 
 - **v0.33.2 (2025-09-05)**
   - 修复深色背景下分页按钮为浅色背景问题 [#149](https://github.com/djylb/nps/pull/149)
