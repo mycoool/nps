@@ -62,9 +62,11 @@ func (c *WsConn) Close() error        { return c.Conn.Close() }
 func (c *WsConn) LocalAddr() net.Addr { return c.Conn.NetConn().LocalAddr() }
 func (c *WsConn) RemoteAddr() net.Addr {
 	if c.RealIP != "" {
-		return &net.TCPAddr{
-			IP:   net.ParseIP(c.RealIP),
-			Port: 0,
+		if ip := net.ParseIP(c.RealIP); ip != nil {
+			return &net.TCPAddr{
+				IP:   ip,
+				Port: 0,
+			}
 		}
 	}
 	return c.Conn.NetConn().RemoteAddr()
