@@ -29,6 +29,8 @@ var BridgeTlsPort string
 var BridgeWsPort string
 var BridgeWssPort string
 var BridgePath string
+var BridgeTrustedIps string
+var BridgeRealIpHeader string
 var HttpIp string
 var HttpPort string
 var HttpsPort string
@@ -59,6 +61,8 @@ func InitConnectionService() {
 	BridgeWsPort = beego.AppConfig.String("bridge_ws_port")
 	BridgeWssPort = beego.AppConfig.String("bridge_wss_port")
 	BridgePath = beego.AppConfig.String("bridge_path")
+	BridgeTrustedIps = beego.AppConfig.String("bridge_trusted_ips")
+	BridgeRealIpHeader = beego.AppConfig.String("bridge_real_ip_header")
 	HttpIp = beego.AppConfig.String("http_proxy_ip")
 	HttpPort = beego.AppConfig.String("http_proxy_port")
 	HttpsPort = beego.AppConfig.String("https_proxy_port")

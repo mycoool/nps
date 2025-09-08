@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"net/http"
 	"strconv"
 	"strings"
 	"sync"
@@ -414,4 +415,41 @@ func normalizeTarget(src, dst net.Addr) net.Addr {
 	default:
 		return dst
 	}
+}
+
+func GetRealIP(r *http.Request, header string) string {
+	if header != "" {
+		if v := r.Header.Get(header); v != "" {
+			for _, p := range strings.Split(v, ",") {
+				if ip := common.GetIpByAddr(strings.TrimSpace(p)); ip != "" {
+					return ip
+				}
+			}
+		}
+		if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+			return host
+		}
+		return r.RemoteAddr
+	}
+
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		for _, p := range strings.Split(xff, ",") {
+			if ip := common.GetIpByAddr(strings.TrimSpace(p)); ip != "" {
+				return ip
+			}
+		}
+	}
+
+	if xrip := r.Header.Get("X-Real-IP"); xrip != "" {
+		for _, p := range strings.Split(xrip, ",") {
+			if ip := common.GetIpByAddr(strings.TrimSpace(p)); ip != "" {
+				return ip
+			}
+		}
+	}
+
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return host
+	}
+	return r.RemoteAddr
 }

@@ -4,7 +4,6 @@ import (
 	"html/template"
 	"math/rand"
 	"net"
-	"strings"
 	"sync"
 	"time"
 
@@ -87,7 +86,7 @@ func (s *LoginController) Verify() {
 	username := s.GetString("username")
 	ip, _, _ := net.SplitHostPort(s.Ctx.Request.RemoteAddr)
 	httpOnlyPass := beego.AppConfig.String("x_nps_http_only")
-	if (beego.AppConfig.DefaultBool("allow_x_real_ip", false) && isTrustedProxy(ip)) ||
+	if (beego.AppConfig.DefaultBool("allow_x_real_ip", false) && common.IsTrustedProxy(beego.AppConfig.DefaultString("trusted_proxy_ips", "127.0.0.1"), ip)) ||
 		(httpOnlyPass != "" && s.Ctx.Request.Header.Get("X-NPS-Http-Only") == httpOnlyPass) {
 		if realIP := s.Ctx.Request.Header.Get("X-Real-IP"); realIP != "" {
 			ip = realIP
@@ -184,7 +183,7 @@ func (s *LoginController) doLogin(username, password, totp string, explicit bool
 	clearIpRecord()
 	ip, _, _ := net.SplitHostPort(s.Ctx.Request.RemoteAddr)
 	httpOnlyPass := beego.AppConfig.String("x_nps_http_only")
-	if (beego.AppConfig.DefaultBool("allow_x_real_ip", false) && isTrustedProxy(ip)) ||
+	if (beego.AppConfig.DefaultBool("allow_x_real_ip", false) && common.IsTrustedProxy(beego.AppConfig.DefaultString("trusted_proxy_ips", "127.0.0.1"), ip)) ||
 		(httpOnlyPass != "" && s.Ctx.Request.Header.Get("X-NPS-Http-Only") == httpOnlyPass) {
 		if realIP := s.Ctx.Request.Header.Get("X-Real-IP"); realIP != "" {
 			ip = realIP
@@ -405,51 +404,4 @@ func adminAuth(username, password, totp string) bool {
 		}
 	}
 	return password == expectedPass
-}
-
-func isTrustedProxy(ip string) bool {
-	list := beego.AppConfig.DefaultString("trusted_proxy_ips", "127.0.0.1")
-	for _, entry := range strings.Split(list, ",") {
-		entry = strings.TrimSpace(entry)
-		if entry == "" {
-			continue
-		}
-
-		// if CIDR
-		if strings.Contains(entry, "/") {
-			if _, cidrNet, err := net.ParseCIDR(entry); err == nil {
-				if cidrNet.Contains(net.ParseIP(ip)) {
-					return true
-				}
-			}
-			continue
-		}
-
-		// if "192.168.*.*"
-		if strings.Contains(entry, "*") {
-			pSegs := strings.Split(entry, ".")
-			ipSegs := strings.Split(ip, ".")
-			if len(pSegs) == 4 && len(ipSegs) == 4 {
-				matched := true
-				for i := 0; i < 4; i++ {
-					if pSegs[i] == "*" {
-						continue
-					}
-					if pSegs[i] != ipSegs[i] {
-						matched = false
-						break
-					}
-				}
-				if matched {
-					return true
-				}
-			}
-			continue
-		}
-
-		if entry == ip {
-			return true
-		}
-	}
-	return false
 }

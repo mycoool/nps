@@ -1119,3 +1119,78 @@ func ValidatePoW(bits int, parts ...string) bool {
 	}
 	return true
 }
+
+func IsTrustedProxy(list, ipStr string) bool {
+	if list == "" || ipStr == "" {
+		return false
+	}
+
+	ipStr = strings.TrimSpace(ipStr)
+
+	if h, _, err := net.SplitHostPort(ipStr); err == nil {
+		ipStr = h
+	}
+	if strings.HasPrefix(ipStr, "[") && strings.HasSuffix(ipStr, "]") {
+		ipStr = ipStr[1 : len(ipStr)-1]
+	}
+	if i := strings.LastIndex(ipStr, "%"); i != -1 { // fe80::1%eth0
+		ipStr = ipStr[:i]
+	}
+
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return false
+	}
+	ip4 := ip.To4()
+
+	for _, raw := range strings.Split(list, ",") {
+		entry := strings.TrimSpace(raw)
+		if entry == "" {
+			continue
+		}
+
+		if entry == "*" {
+			return true
+		}
+
+		// CIDR（IPv4/IPv6）
+		if strings.Contains(entry, "/") {
+			if _, cidr, err := net.ParseCIDR(entry); err == nil && cidr.Contains(ip) {
+				return true
+			}
+			continue
+		}
+
+		// if "192.168.*.*"
+		if strings.Contains(entry, "*") {
+			if ip4 == nil {
+				continue
+			}
+			pSegs := strings.Split(entry, ".")
+			if len(pSegs) != 4 {
+				continue
+			}
+			matched := true
+			for i := 0; i < 4; i++ {
+				if pSegs[i] == "*" {
+					continue
+				}
+				n, err := strconv.Atoi(pSegs[i])
+				if err != nil || n < 0 || n > 255 || int(ip4[i]) != n {
+					matched = false
+					break
+				}
+			}
+			if matched {
+				return true
+			}
+			continue
+		}
+
+		if e := net.ParseIP(entry); e != nil && e.Equal(ip) {
+			return true
+		}
+	}
+
+	return false
+}

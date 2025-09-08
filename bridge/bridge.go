@@ -110,7 +110,7 @@ func (s *Bridge) StartTunnel() error {
 				os.Exit(0)
 				return
 			}
-			wsLn := conn.NewWSListener(wsListener, connection.BridgePath)
+			wsLn := conn.NewWSListener(wsListener, connection.BridgePath, connection.BridgeTrustedIps, connection.BridgeRealIpHeader)
 			conn.Accept(wsLn, func(c net.Conn) {
 				s.cliProcess(conn.NewConn(c), "ws")
 			})
@@ -126,7 +126,7 @@ func (s *Bridge) StartTunnel() error {
 				os.Exit(0)
 				return
 			}
-			wssLn := conn.NewWSSListener(wssListener, connection.BridgePath, crypt.GetCert())
+			wssLn := conn.NewWSSListener(wssListener, connection.BridgePath, crypt.GetCert(), connection.BridgeTrustedIps, connection.BridgeRealIpHeader)
 			conn.Accept(wssLn, func(c net.Conn) {
 				s.cliProcess(conn.NewConn(c), "wss")
 			})
