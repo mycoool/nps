@@ -511,7 +511,7 @@ func (mgr *P2PManager) handleUdpMonitor(cfg *config.CommonConfig, l *config.Loca
 		}
 		addrRetry = 0
 
-		for i := 0; i < 10; i++ {
+		for i := 0; i < 3; i++ {
 			logs.Debug("try P2P hole punch %d", i+1)
 			select {
 			case <-mgr.ctx.Done():
@@ -520,22 +520,26 @@ func (mgr *P2PManager) handleUdpMonitor(cfg *config.CommonConfig, l *config.Loca
 			}
 			if errV4 == nil {
 				mgr.newUdpConn(tmpConnV4.LocalAddr().String(), cfg, l)
-			}
-			mgr.mu.Lock()
-			if mgr.statusOK {
+				mgr.mu.Lock()
+				if mgr.statusOK {
+					mgr.mu.Unlock()
+					break
+				}
 				mgr.mu.Unlock()
-				break
+				notReadyRetry++
 			}
-			mgr.mu.Unlock()
+
 			if errV6 == nil {
 				mgr.newUdpConn(tmpConnV6.LocalAddr().String(), cfg, l)
-			}
-			mgr.mu.Lock()
-			if mgr.statusOK {
+				mgr.mu.Lock()
+				if mgr.statusOK {
+					mgr.mu.Unlock()
+					break
+				}
 				mgr.mu.Unlock()
-				break
+				notReadyRetry++
 			}
-			mgr.mu.Unlock()
+
 			time.Sleep(50 * time.Millisecond)
 		}
 
@@ -543,7 +547,6 @@ func (mgr *P2PManager) handleUdpMonitor(cfg *config.CommonConfig, l *config.Loca
 		stillBad := !mgr.statusOK
 		mgr.mu.Unlock()
 		if stillBad {
-			notReadyRetry++
 			if notReadyRetry >= maxRetry {
 				logs.Error("P2P connection not established after %d retries (~%ds), exiting.", notReadyRetry, maxRetry)
 				mgr.resetStatus(false)
