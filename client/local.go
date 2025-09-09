@@ -30,6 +30,7 @@ type Closer interface{ Close() error }
 type P2PManager struct {
 	ctx          context.Context
 	cancel       context.CancelFunc
+	pCancel      context.CancelFunc
 	mu           sync.Mutex
 	wg           sync.WaitGroup
 	cfg          *config.CommonConfig
@@ -74,18 +75,19 @@ func NewP2pBridge(mgr *P2PManager, l *config.LocalServer) *P2pBridge {
 	}
 }
 
-func NewP2PManager(parentCtx context.Context, cfg *config.CommonConfig) *P2PManager {
-	ctx, cancel := context.WithCancel(parentCtx)
+func NewP2PManager(pCtx context.Context, pCancel context.CancelFunc, cfg *config.CommonConfig) *P2PManager {
+	ctx, cancel := context.WithCancel(pCtx)
 	mgr := &P2PManager{
 		ctx:          ctx,
 		cancel:       cancel,
+		pCancel:      pCancel,
 		cfg:          cfg,
 		monitor:      false,
 		statusCh:     make(chan struct{}, 1),
 		proxyServers: make([]Closer, 0),
 	}
 	go func() {
-		<-parentCtx.Done()
+		<-pCtx.Done()
 		mgr.Close()
 	}()
 	return mgr
@@ -220,7 +222,12 @@ func (b *P2pBridge) sendViaSecret(link *conn.Link) (net.Conn, error) {
 	mgr := b.mgr
 	sc, err := mgr.getSecretConn()
 	if err != nil {
-		logs.Trace("getSecretConn failed, retrying: %v", err)
+		if AutoReconnect {
+			logs.Trace("getSecretConn failed, retrying: %v", err)
+		} else {
+			logs.Trace("getSecretConn failed: %v", err)
+			mgr.pCancel()
+		}
 		return nil, err
 	}
 	if _, err := sc.Write([]byte(crypt.Md5(b.local.Password))); err != nil {
@@ -594,7 +601,11 @@ func (mgr *P2PManager) newUdpConn(localAddr string, cfg *config.CommonConfig, l 
 		c, uuid, err = NewConn(cfg.Tp, cfg.VKey, cfg.Server, cfg.ProxyUrl)
 		if err != nil {
 			logs.Error("Failed to connect to server: %v", err)
-			time.Sleep(5 * time.Second)
+			if AutoReconnect {
+				time.Sleep(5 * time.Second)
+			} else {
+				mgr.pCancel()
+			}
 			return
 		}
 		defer c.Close()

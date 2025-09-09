@@ -69,6 +69,7 @@ var (
 	timezone       = flag.String("timezone", "", "Time zone to use for time(eg: Asia/Shanghai)")
 	genTOTP        = flag.Bool("gen2fa", false, "Generate TOTP Secret")
 	getTOTP        = flag.String("get2fa", "", "Get TOTP Code")
+	autoReconnect  = flag.Bool("auto_reconnect", true, "Auto Reconnect")
 )
 
 func main() {
@@ -90,6 +91,7 @@ func main() {
 	client.Ver = *protoVer
 	client.SkipTLSVerify = *skipVerify
 	client.DisableP2P = *disableP2P
+	client.AutoReconnect = *autoReconnect
 	crypt.SkipVerify = *skipVerify
 	if *protoVer < 2 {
 		crypt.SkipVerify = true
@@ -164,7 +166,7 @@ func main() {
 	s, err := service.New(prg, svcConfig)
 	if err != nil {
 		logs.Error("service function disabled %v", err)
-		run(ctx)
+		run(ctx, cancel)
 		// run without service
 		wg := sync.WaitGroup{}
 		wg.Add(1)
@@ -324,7 +326,7 @@ func (p *Npc) run() error {
 			logs.Warn("npc: panic serving %v: %s", err, buf)
 		}
 	}()
-	run(p.ctx)
+	run(p.ctx, p.cancel)
 	select {
 	case <-p.exit:
 		logs.Warn("stop...")
@@ -333,7 +335,7 @@ func (p *Npc) run() error {
 }
 
 // 主运行逻辑
-func run(ctx context.Context) {
+func run(ctx context.Context, cancel context.CancelFunc) {
 	common.InitPProfByAddr(*pprofAddr)
 	if *tlsEnable {
 		*connType = "tls"
@@ -357,7 +359,7 @@ func run(ctx context.Context) {
 		commonConfig.Client = new(file.Client)
 		commonConfig.Client.Cnf = new(file.Config)
 		commonConfig.DisconnectTime = *p2pTime
-		p2pm := client.NewP2PManager(ctx, commonConfig)
+		p2pm := client.NewP2PManager(ctx, cancel, commonConfig)
 		go p2pm.StartLocalServer(localServer)
 		return
 	}
@@ -412,8 +414,14 @@ func run(ctx context.Context) {
 				for {
 					logs.Info("Start server: %s vkey: %s type: %s", serverAddr, verifyKey, connType)
 					client.NewRPClient(serverAddr, verifyKey, connType, *proxyUrl, "", nil, *disconnectTime, nil).Start(ctx)
-					logs.Info("Client closed! It will be reconnected in five seconds")
-					time.Sleep(time.Second * 5)
+					if *autoReconnect {
+						logs.Info("Client closed! It will be reconnected in five seconds")
+						time.Sleep(time.Second * 5)
+					} else {
+						logs.Info("Client closed!")
+						cancel()
+						return
+					}
 				}
 			}()
 		}
@@ -429,7 +437,7 @@ func run(ctx context.Context) {
 		}
 
 		for _, path := range configPaths {
-			go client.StartFromFile(ctx, path)
+			go client.StartFromFile(ctx, cancel, path)
 		}
 	}
 }

@@ -36,6 +36,7 @@ const MaxPad = 64
 var Ver = version.GetLatestIndex()
 var SkipTLSVerify = false
 var DisableP2P = false
+var AutoReconnect = true
 var P2PMode = common.CONN_QUIC
 
 var TlsCfg = &tls.Config{
@@ -118,7 +119,7 @@ func RegisterLocalIp(server string, vKey string, tp string, proxyUrl string, hou
 
 var errAdd = errors.New("the server returned an error, which port or host may have been occupied or not allowed to open")
 
-func StartFromFile(pCtx context.Context, path string) {
+func StartFromFile(pCtx context.Context, pCancel context.CancelFunc, path string) {
 	cnf, err := config.NewConfig(path)
 	if err != nil || cnf.CommonConfig == nil {
 		logs.Error("Config file %s loading error %v", path, err)
@@ -145,7 +146,8 @@ func StartFromFile(pCtx context.Context, path string) {
 			return
 		default:
 		}
-		if !first && !cnf.CommonConfig.AutoReconnection {
+		if !first && (!cnf.CommonConfig.AutoReconnection || !AutoReconnect) {
+			pCancel()
 			return
 		}
 		if !first {
@@ -159,7 +161,7 @@ func StartFromFile(pCtx context.Context, path string) {
 		}
 
 		if len(cnf.LocalServer) > 0 {
-			p2pm := NewP2PManager(pCtx, cnf.CommonConfig)
+			p2pm := NewP2PManager(pCtx, pCancel, cnf.CommonConfig)
 			//create local server secret or p2p
 			for _, v := range cnf.LocalServer {
 				go p2pm.StartLocalServer(v)
