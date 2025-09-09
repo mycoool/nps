@@ -208,8 +208,9 @@ func (s *HttpServer) handleProxy(w http.ResponseWriter, r *http.Request) {
 				req.Header["X-Forwarded-For"] = nil
 			}
 		},
-		Transport:     tr,
-		FlushInterval: 100 * time.Millisecond,
+		Transport: tr,
+		//FlushInterval: 100 * time.Millisecond,
+		BufferPool: &common.CopyBuff,
 		ModifyResponse: func(resp *http.Response) error {
 			// CORS
 			if host.AutoCORS {
