@@ -379,7 +379,7 @@
                 sortable: true,//启用排序
                 formatter: function (value, row, index) {
                     if (value) {
-                        return '<span class="badge badge-primary" langtag="word-online"></span>'
+                        return '<span class="badge badge-primary" langtag="word-online" style="cursor:pointer;" onclick="pingClient(this,' + row.Id + ')"></span>'
                     } else {
                         return '<span class="badge badge-badge" langtag="word-offline"></span>'
                     }
@@ -433,6 +433,36 @@
             }
         ]
     });
+
+    function pingClient(el, id) {
+        var $el = $(el);
+        if ($el.data('pinging')) return;
+        var oldText = $el.text();
+        $el.data('pinging', true)
+            .attr('title', 'Pinging...')
+            .text('...')
+            .addClass('disabled');
+        $.ajax({
+            url: '{{.web_base_url}}/client/pingclient',
+            type: 'POST',
+            dataType: 'json',
+            data: { id: id }
+        }).done(function (res) {
+            if (res && res.code === 1) {
+                var ms = parseInt(res.rtt, 10);
+                if (isNaN(ms)) ms = res.rtt;
+                $el.text(ms + ' ms');
+            } else {
+                $el.text('ERR');
+            }
+        }).fail(function () {
+            $el.text('ERR');
+        }).always(function () {
+            $el.data('pinging', false)
+                .removeClass('disabled')
+                .removeAttr('title');
+        });
+    }
 
     function showQr(el) {
         var url = el.getAttribute('data-url');
