@@ -518,12 +518,16 @@ func (s *IndexController) EditHost() {
 			s.error()
 		} else {
 			oleHost := h.Host
-			if h.Host != s.getEscapeString("host") || h.Location != s.getEscapeString("location") || h.Scheme != s.getEscapeString("scheme") {
+			scheme := s.getEscapeString("scheme")
+			if scheme != "all" && scheme != "http" && scheme != "https" {
+				scheme = "all"
+			}
+			if h.Host != s.getEscapeString("host") || h.Location != s.getEscapeString("location") || h.Scheme != scheme {
 				tmpHost := new(file.Host)
 				tmpHost.Id = h.Id
 				tmpHost.Host = s.getEscapeString("host")
 				tmpHost.Location = s.getEscapeString("location")
-				tmpHost.Scheme = s.getEscapeString("scheme")
+				tmpHost.Scheme = scheme
 				if file.GetDb().IsHostExist(tmpHost) {
 					s.AjaxErr("host has exist")
 					return
@@ -547,7 +551,7 @@ func (s *IndexController) EditHost() {
 			h.Location = s.getEscapeString("location")
 			h.PathRewrite = s.getEscapeString("path_rewrite")
 			h.RedirectURL = s.getEscapeString("redirect_url")
-			h.Scheme = s.getEscapeString("scheme")
+			h.Scheme = scheme
 			h.HttpsJustProxy = s.GetBoolNoErr("https_just_proxy")
 			h.AutoSSL = s.GetBoolNoErr("auto_ssl")
 			h.KeyFile = s.getEscapeString("key_file")

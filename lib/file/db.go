@@ -319,6 +319,9 @@ func (s *DbUtils) NewHost(t *Host) error {
 	if t.Location == "" {
 		t.Location = "/"
 	}
+	if t.Scheme != "all" && t.Scheme != "http" && t.Scheme != "https" {
+		t.Scheme = "all"
+	}
 	if s.IsHostExist(t) {
 		return errors.New("host has exist")
 	}
