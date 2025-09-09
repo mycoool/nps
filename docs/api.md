@@ -212,6 +212,7 @@ curl -X POST \
 ### 单个客户端操作
 
 - **获取详情**：`POST /client/getclient`（参数 `id`）
+- **延迟检查**：`POST /client/pingclient`（参数 `id`）
 - **修改状态**：`POST /client/changestatus`（参数 `id`、`status`）（`0` 否，`1` 是）
 - **删除客户端**：`POST /client/del`（参数 `id`）
 

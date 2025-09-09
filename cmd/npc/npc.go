@@ -34,7 +34,7 @@ var (
 	configPath     = flag.String("config", "", "Configuration file path (path1,path2)")
 	verifyKey      = flag.String("vkey", "", "Authentication key (eg: vkey1,vkey2)")
 	logType        = flag.String("log", "file", "Log output mode (stdout|file|both|off)")
-	connType       = flag.String("type", "tcp", "Connection type with the server (kcp|tcp|tls) (eg: tcp,tls)")
+	connType       = flag.String("type", "tcp", "Connection type with the server (tcp|tls|kcp|quic|ws|wss) (eg: tcp,tls)")
 	proxyUrl       = flag.String("proxy", "", "Proxy socks5 URL (eg: socks5://user:pass@127.0.0.1:9007)")
 	logLevel       = flag.String("log_level", "trace", "Log level (trace|debug|info|warn|error|fatal|panic|off)")
 	registerTime   = flag.Int("time", 2, "Register time in hours")
