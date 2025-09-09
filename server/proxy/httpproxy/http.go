@@ -186,8 +186,8 @@ func (s *HttpServer) handleProxy(w http.ResponseWriter, r *http.Request) {
 			DisableKeepAlives:     host.CompatMode,
 			DialContext:           s.DialContext,
 			DialTLSContext:        s.DialTlsContext,
-			MaxIdleConns:          1000,
-			MaxIdleConnsPerHost:   100,
+			MaxIdleConns:          1024,
+			MaxIdleConnsPerHost:   256,
 			IdleConnTimeout:       90 * time.Second,
 		}
 		s.HttpProxyCache.Add(host.Id, tr)
