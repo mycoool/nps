@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -89,6 +90,9 @@ func NewP2PManager(pCtx context.Context, pCancel context.CancelFunc, cfg *config
 	go func() {
 		<-pCtx.Done()
 		mgr.Close()
+		if !AutoReconnect {
+			os.Exit(1)
+		}
 	}()
 	return mgr
 }
@@ -629,18 +633,30 @@ func (mgr *P2PManager) newUdpConn(localAddr string, cfg *config.CommonConfig, l 
 	err = SendType(remoteConn, common.WORK_P2P, uuid)
 	if err != nil {
 		logs.Error("Failed to send type to server: %v", err)
-		time.Sleep(5 * time.Second)
+		if AutoReconnect {
+			time.Sleep(5 * time.Second)
+		} else {
+			mgr.pCancel()
+		}
 		return
 	}
 	if _, err := remoteConn.Write([]byte(crypt.Md5(l.Password))); err != nil {
 		logs.Error("Failed to send password to server: %v", err)
-		time.Sleep(5 * time.Second)
+		if AutoReconnect {
+			time.Sleep(5 * time.Second)
+		} else {
+			mgr.pCancel()
+		}
 		return
 	}
 	rAddrBuf, err := remoteConn.GetShortLenContent()
 	if err != nil {
 		logs.Error("Target client is offline or tunnel config not found: %v", err)
-		time.Sleep(5 * time.Second)
+		if AutoReconnect {
+			time.Sleep(5 * time.Second)
+		} else {
+			mgr.pCancel()
+		}
 		return
 	}
 	rAddr := string(rAddrBuf)

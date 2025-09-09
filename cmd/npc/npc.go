@@ -420,6 +420,7 @@ func run(ctx context.Context, cancel context.CancelFunc) {
 					} else {
 						logs.Info("Client closed!")
 						cancel()
+						os.Exit(1)
 						return
 					}
 				}

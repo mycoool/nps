@@ -148,6 +148,7 @@ func StartFromFile(pCtx context.Context, pCancel context.CancelFunc, path string
 		}
 		if !first && (!cnf.CommonConfig.AutoReconnection || !AutoReconnect) {
 			pCancel()
+			os.Exit(1)
 			return
 		}
 		if !first {
