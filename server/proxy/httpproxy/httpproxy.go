@@ -218,6 +218,9 @@ func (s *HttpProxy) ChangeHostAndHeader(r *http.Request, host string, header str
 		if r.Header.Get("X-Forwarded-Proto") == "" {
 			r.Header.Set("X-Forwarded-Proto", scheme)
 		}
+		//if r.Header.Get("X-Forwarded-Host") == "" {
+		//	r.Header.Set("X-Forwarded-Host", origHost)
+		//}
 		//r.Header.Set("X-Forwarded-For", clientIP)
 		r.Header.Set("X-Real-IP", clientIP)
 	}
