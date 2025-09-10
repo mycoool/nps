@@ -343,15 +343,6 @@ func (s *HttpServer) handleWebsocket(w http.ResponseWriter, r *http.Request, hos
 		return
 	}
 
-	good := (r.Method == http.MethodConnect && resp.StatusCode == http.StatusOK) ||
-		(r.Method != http.MethodConnect && resp.StatusCode == http.StatusSwitchingProtocols)
-	if !good {
-		logs.Error("handleWebsocket: unexpected status code in handshake: %d", resp.StatusCode)
-		_ = netConn.Close()
-		_ = clientConn.Close()
-		return
-	}
-
 	if err := resp.Write(clientBuf); err != nil {
 		logs.Error("handleWebsocket: failed to write handshake response to client: %v", err)
 		_ = netConn.Close()
@@ -387,6 +378,15 @@ func (s *HttpServer) handleWebsocket(w http.ResponseWriter, r *http.Request, hos
 			return
 		}
 		clientConn = conn.NewConn(clientConn).SetRb(pending)
+	}
+
+	good := (r.Method == http.MethodConnect && resp.StatusCode == http.StatusOK) ||
+		(r.Method != http.MethodConnect && resp.StatusCode == http.StatusSwitchingProtocols)
+	if !good {
+		logs.Error("handleWebsocket: unexpected status code in handshake: %d", resp.StatusCode)
+		_ = netConn.Close()
+		_ = clientConn.Close()
+		return
 	}
 
 	goroutine.Join(clientConn, netConn, []*file.Flow{host.Flow, host.Client.Flow}, s.Task, r.RemoteAddr)
