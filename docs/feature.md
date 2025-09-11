@@ -114,6 +114,7 @@ X-Forwarded-Ssl: ${ssl}
 | `${http_connection}`           | 原始请求的 `Connection` 头                   |
 | `${http_range}`                | 原始请求的 `Range` 头                        |
 | `${http_if_range}`             | 原始请求的 `If-Range` 头                     |
+| `${unset}`                     | 删除该头                                   |
 
 ## 自定义响应 Header
 
@@ -157,6 +158,7 @@ Access-Control-Allow-Credentials: true
 | `${date}`              | 当前 UTC 时间，格式符合 HTTP Date（RFC 1123）        |
 | `${timestamp}`         | 当前时间戳（秒）                                  |
 | `${timestamp_ms}`      | 当前时间戳（毫秒）                                 |
+| `${unset}`             | 删除该头                                      |
 
 ## 404页面配置
 
