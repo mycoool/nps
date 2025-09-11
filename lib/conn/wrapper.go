@@ -1,6 +1,7 @@
 package conn
 
 import (
+	"fmt"
 	"io"
 	"net"
 	"time"
@@ -46,4 +47,51 @@ func (w *wrappedConn) SetReadDeadline(t time.Time) error {
 
 func (w *wrappedConn) SetWriteDeadline(t time.Time) error {
 	return w.parent.SetWriteDeadline(t)
+}
+
+type AddrOverrideConn struct {
+	net.Conn
+	lAddr *net.TCPAddr
+	rAddr *net.TCPAddr
+}
+
+func NewAddrOverrideConn(base net.Conn, remote, local string) (*AddrOverrideConn, error) {
+	if base == nil {
+		return nil, fmt.Errorf("base conn is nil")
+	}
+	rAddr, err := parseTCPAddrMaybe(remote)
+	if err != nil {
+		return nil, fmt.Errorf("invalid remote addr %q: %w", remote, err)
+	}
+	lAddr, err := parseTCPAddrMaybe(local)
+	if err != nil {
+		return nil, fmt.Errorf("invalid local addr %q: %w", local, err)
+	}
+	return &AddrOverrideConn{
+		Conn:  base,
+		lAddr: lAddr,
+		rAddr: rAddr,
+	}, nil
+}
+
+func NewAddrOverrideFromTCP(base net.Conn, remote, local *net.TCPAddr) *AddrOverrideConn {
+	return &AddrOverrideConn{
+		Conn:  base,
+		lAddr: local,
+		rAddr: remote,
+	}
+}
+
+func (c *AddrOverrideConn) LocalAddr() net.Addr {
+	if c.lAddr != nil {
+		return c.lAddr
+	}
+	return c.Conn.LocalAddr()
+}
+
+func (c *AddrOverrideConn) RemoteAddr() net.Addr {
+	if c.rAddr != nil {
+		return c.rAddr
+	}
+	return c.Conn.RemoteAddr()
 }

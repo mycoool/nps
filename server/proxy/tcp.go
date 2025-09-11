@@ -21,6 +21,7 @@ import (
 type TunnelModeServer struct {
 	*BaseServer
 	process           process
+	address           string
 	listener          net.Listener
 	activeConnections sync.Map
 }
@@ -38,29 +39,8 @@ func (s *TunnelModeServer) Start() error {
 	if s.Task.ServerIp == "" {
 		s.Task.ServerIp = "0.0.0.0"
 	}
-	return conn.NewTcpListenerAndProcess(common.BuildAddress(s.Task.ServerIp, strconv.Itoa(s.Task.Port)), func(c net.Conn) {
-		s.activeConnections.Store(c, struct{}{})
-		defer func() {
-			s.activeConnections.Delete(c)
-			if c != nil {
-				_ = c.Close()
-			}
-		}()
-
-		if s.Bridge.IsServer() {
-			if err := s.CheckFlowAndConnNum(s.Task.Client); err != nil {
-				logs.Warn("client Id %d, task Id %d, error %v, when tcp connection", s.Task.Client.Id, s.Task.Id, err)
-				_ = c.Close()
-				return
-			}
-			defer s.Task.Client.CutConn()
-			s.Task.AddConn()
-			defer s.Task.CutConn()
-		}
-		logs.Trace("new tcp connection,local port %d,client %d,remote address %v", s.Task.Port, s.Task.Client.Id, c.RemoteAddr())
-
-		_ = s.process(conn.NewConn(c), s)
-	}, &s.listener)
+	s.address = common.BuildAddress(s.Task.ServerIp, strconv.Itoa(s.Task.Port))
+	return conn.NewTcpListenerAndProcess(s.address, s.handleConn, &s.listener)
 }
 
 func (s *TunnelModeServer) Close() error {
@@ -73,6 +53,47 @@ func (s *TunnelModeServer) Close() error {
 	})
 	s.activeConnections = sync.Map{}
 	return s.listener.Close()
+}
+
+func (s *TunnelModeServer) ServeVirtual(c net.Conn) {
+	s.handleConn(c)
+}
+
+func (s *TunnelModeServer) DialVirtual(rAddr string) (net.Conn, error) {
+	a, b := net.Pipe()
+	c, err := conn.NewAddrOverrideConn(b, rAddr, s.address)
+	if err != nil {
+		return nil, err
+	}
+	go s.handleConn(c)
+	return a, nil
+}
+
+func (s *TunnelModeServer) handleConn(c net.Conn) {
+	if c == nil {
+		return
+	}
+	s.activeConnections.Store(c, struct{}{})
+	defer func() {
+		s.activeConnections.Delete(c)
+		if c != nil {
+			_ = c.Close()
+		}
+	}()
+
+	if s.Bridge.IsServer() {
+		if err := s.CheckFlowAndConnNum(s.Task.Client); err != nil {
+			logs.Warn("client Id %d, task Id %d, error %v, when tcp connection", s.Task.Client.Id, s.Task.Id, err)
+			_ = c.Close()
+			return
+		}
+		defer s.Task.Client.CutConn()
+		s.Task.AddConn()
+		defer s.Task.CutConn()
+	}
+	logs.Trace("new tcp connection,local port %d,client %d,remote address %v", s.Task.Port, s.Task.Client.Id, c.RemoteAddr())
+
+	_ = s.process(conn.NewConn(c), s)
 }
 
 type process func(c *conn.Conn, s *TunnelModeServer) error

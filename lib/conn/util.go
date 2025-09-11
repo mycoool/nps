@@ -453,3 +453,14 @@ func GetRealIP(r *http.Request, header string) string {
 	}
 	return r.RemoteAddr
 }
+
+func parseTCPAddrMaybe(s string) (*net.TCPAddr, error) {
+	if s == "" {
+		return nil, nil
+	}
+	a, err := net.ResolveTCPAddr("tcp", s)
+	if err != nil {
+		return nil, err
+	}
+	return a, nil
+}

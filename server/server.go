@@ -7,6 +7,7 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -39,6 +40,16 @@ var (
 
 func init() {
 	RunList = sync.Map{}
+	tool.SetLookup(func(id int) (tool.Dialer, bool) {
+		if v, ok := RunList.Load(id); ok {
+			if svr, ok := v.(*proxy.TunnelModeServer); ok {
+				if !strings.Contains(svr.Task.Target.TargetStr, "tunnel://") {
+					return svr, true
+				}
+			}
+		}
+		return nil, false
+	})
 }
 
 // InitFromDb init task from db

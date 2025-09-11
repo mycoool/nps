@@ -845,6 +845,18 @@ func (s *Bridge) SendLinkInfo(clientId int, link *conn.Link, t *file.Tunnel) (ta
 			go conn.HandleUdp5(context.Background(), handlerSide, link.Option.Timeout)
 			return serverSide, nil
 		}
+		if strings.Contains(link.Host, "tunnel://") {
+			key := strings.TrimPrefix(strings.TrimSpace(link.Host), "tunnel://")
+			var id int
+			id, err = strconv.Atoi(key)
+			if err != nil {
+				return nil, err
+			}
+			if t.Id == id {
+				return nil, fmt.Errorf("task %d cannot connect to itself (tunnel://%d)", t.Id, id)
+			}
+			return tool.GetTunnelConn(id, link.RemoteAddr)
+		}
 		network := "tcp"
 		if link.ConnType == common.CONN_UDP {
 			network = "udp"
