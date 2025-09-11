@@ -148,7 +148,7 @@ func (s *TunnelModeServer) doConnect(c net.Conn, command uint8) {
 	}
 	_ = s.DealClient(conn.NewConn(c), s.Task.Client, addr, nil, ltype, func() {
 		s.sendReply(c, succeeded)
-	}, []*file.Flow{s.Task.Flow, s.Task.Client.Flow}, s.Task.Target.ProxyProtocol, s.Task.Target.LocalProxy, s.Task)
+	}, []*file.Flow{s.Task.Flow, s.Task.Client.Flow}, 0, s.Task.Target.LocalProxy, s.Task)
 	return
 }
 
