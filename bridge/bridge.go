@@ -905,6 +905,7 @@ func (s *Bridge) SendLinkInfo(clientId int, link *conn.Link, t *file.Tunnel) (ta
 		err = errors.New("the client connect error")
 		return
 	}
+
 	switch tun := tunnel.(type) {
 	case *mux.Mux:
 		target, err = tun.NewConn()

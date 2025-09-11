@@ -142,7 +142,7 @@ npc update && npc restart
 - **v0.33.5 (2025-09-11)**
   - 允许WS向浏览器返回错误
   - 混合代理禁用代理协议
-  - 添加隧道嵌套转发支持
+  - 添加隧道嵌套转发支持 [使用说明](https://d-jy.net/docs/nps/#/feature?id=%e5%b5%8c%e5%a5%97%e8%bd%ac%e5%8f%91%e6%94%af%e6%8c%81)
   - 域名转发请求头默认插入`X-Forwarded-Host`
   - 添加头部删除支持
   - 更新相关依赖包
