@@ -278,6 +278,12 @@ func (s *HttpProxy) ChangeHostAndHeader(r *http.Request, host string, header str
 			}
 			val := strings.TrimSpace(hd[1])
 			val = html.UnescapeString(val)
+			if val == "${unset}" {
+				if !strings.EqualFold(key, "Host") {
+					r.Header.Del(key)
+				}
+				continue
+			}
 			val = expandVars(val)
 			r.Header.Set(key, val)
 		}
@@ -376,6 +382,10 @@ func (s *HttpProxy) ChangeResponseHeader(resp *http.Response, header string) {
 			}
 			val := strings.TrimSpace(hd[1])
 			val = html.UnescapeString(val)
+			if val == "${unset}" {
+				resp.Header.Del(key)
+				continue
+			}
 			val = expandVars(val)
 			resp.Header.Set(key, val)
 		}
