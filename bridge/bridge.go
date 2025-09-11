@@ -852,7 +852,7 @@ func (s *Bridge) SendLinkInfo(clientId int, link *conn.Link, t *file.Tunnel) (ta
 			if err != nil {
 				return nil, err
 			}
-			if t.Id == id {
+			if t != nil && t.Id == id {
 				return nil, fmt.Errorf("task %d cannot connect to itself (tunnel://%d)", t.Id, id)
 			}
 			return tool.GetTunnelConn(id, link.RemoteAddr)
