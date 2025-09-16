@@ -330,13 +330,9 @@ func NewConn(tp string, vkey string, server string, proxyUrl string) (*conn.Conn
 	} else {
 		alpn = strings.TrimSpace(strings.TrimPrefix(path, "/"))
 	}
-	addr, host := common.SplitAddrAndHost(server)
+	addr, host, sni := common.SplitAddrAndHost(server)
 	server = EnsurePort(addr, tp)
-	sni := common.GetIpByAddr(host)
-	if !common.IsDomain(sni) {
-		sni = ""
-	}
-	//logs.Debug("Server: %s Path: %s", server, path)
+
 	if HasFailed {
 		if s, e := common.GetFastAddr(server, tp); e == nil {
 			server = s

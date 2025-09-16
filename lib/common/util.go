@@ -157,17 +157,26 @@ func SplitServerAndPath(s string) (server, path string) {
 	return s[:index], s[index:]
 }
 
-func SplitAddrAndHost(s string) (addr, host string) {
+func SplitAddrAndHost(s string) (addr, host, sni string) {
+	s = strings.TrimSpace(s)
 	index := strings.Index(s, "@")
 	if index == -1 {
-		return s, s
+		return s, s, GetSni(s)
 	}
 	addr = strings.TrimSpace(s[:index])
 	host = strings.TrimSpace(s[index+1:])
 	if host == "" {
-		host = addr
+		return addr, addr, ""
 	}
-	return
+	return addr, host, GetSni(host)
+}
+
+func GetSni(host string) string {
+	sni := GetIpByAddr(host)
+	if !IsDomain(sni) {
+		sni = ""
+	}
+	return sni
 }
 
 // GetHostByName Get the corresponding IP address through domain name

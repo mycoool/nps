@@ -133,22 +133,22 @@
                 + '<b langtag="word-connectbyconfig"></b>: <span langtag="word-' + row.ConfigConnAllow + '"></span>&emsp;<br/><br/>'
                 + '<b langtag="word-blackip"></b>: ' + row.BlackIpList + '&emsp;<br/><br/>'
                 {{if index . "tcp_p"}}
-                + '<b langtag="word-commandclient-tcp"></b>: ' + '<code onclick="oCopy(this)">' + "./npc{{.win}} -server=\"{{.ip}}:{{.tcp_p}}\" -vkey=\"" + row.VerifyKey + "\" -type=\"tcp\"</code>&emsp;<br/><br/>"
+                + '<b langtag="word-commandclient-tcp"></b>: ' + '<code onclick="oCopy(this)">' + "./npc{{.win}} -server=\"{{.tcp_ip}}:{{.tcp_p}}\" -vkey=\"" + row.VerifyKey + "\" -type=\"tcp\"</code>&emsp;<br/><br/>"
                 {{end}}
                 {{if index . "kcp_p"}}
-                + '<b langtag="word-commandclient-kcp"></b>: ' + '<code onclick="oCopy(this)">' + "./npc{{.win}} -server=\"{{.ip}}:{{.kcp_p}}\" -vkey=\"" + row.VerifyKey + "\" -type=\"kcp\"</code>&emsp;<br/><br/>"
+                + '<b langtag="word-commandclient-kcp"></b>: ' + '<code onclick="oCopy(this)">' + "./npc{{.win}} -server=\"{{.kcp_ip}}:{{.kcp_p}}\" -vkey=\"" + row.VerifyKey + "\" -type=\"kcp\"</code>&emsp;<br/><br/>"
                 {{end}}
                 {{if index . "tls_p"}}
-                + '<b langtag="word-commandclient-tls"></b>: ' + '<code onclick="oCopy(this)">' + "./npc{{.win}} -server=\"{{.ip}}:{{.tls_p}}\" -vkey=\"" + row.VerifyKey + "\" -type=\"tls\"</code>&emsp;<br/><br/>"
+                + '<b langtag="word-commandclient-tls"></b>: ' + '<code onclick="oCopy(this)">' + "./npc{{.win}} -server=\"{{.tls_ip}}:{{.tls_p}}\" -vkey=\"" + row.VerifyKey + "\" -type=\"tls\"</code>&emsp;<br/><br/>"
                 {{end}}
                 {{if index . "quic_p"}}
-                + '<b langtag="word-commandclient-quic"></b>: ' + '<code onclick="oCopy(this)">' + "./npc{{.win}} -server=\"{{.ip}}:{{.quic_p}}\" -vkey=\"" + row.VerifyKey + "\" -type=\"quic\"</code>&emsp;<br/><br/>"
+                + '<b langtag="word-commandclient-quic"></b>: ' + '<code onclick="oCopy(this)">' + "./npc{{.win}} -server=\"{{.quic_addr}}\" -vkey=\"" + row.VerifyKey + "\" -type=\"quic\"</code>&emsp;<br/><br/>"
                 {{end}}
                 {{if index . "ws_p"}}
-                + '<b langtag="word-commandclient-ws"></b>: ' + '<code onclick="oCopy(this)">' + "./npc{{.win}} -server=\"{{.ip}}:{{.ws_p}}{{.ws_path}}\" -vkey=\"" + row.VerifyKey + "\" -type=\"ws\"</code>&emsp;<br/><br/>"
+                + '<b langtag="word-commandclient-ws"></b>: ' + '<code onclick="oCopy(this)">' + "./npc{{.win}} -server=\"{{.ws_ip}}:{{.ws_p}}{{.ws_path}}\" -vkey=\"" + row.VerifyKey + "\" -type=\"ws\"</code>&emsp;<br/><br/>"
                 {{end}}
                 {{if index . "wss_p"}}
-                + '<b langtag="word-commandclient-wss"></b>: ' + '<code onclick="oCopy(this)">' + "./npc{{.win}} -server=\"{{.ip}}:{{.wss_p}}{{.ws_path}}\" -vkey=\"" + row.VerifyKey + "\" -type=\"wss\"</code>&emsp;<br/><br/>"
+                + '<b langtag="word-commandclient-wss"></b>: ' + '<code onclick="oCopy(this)">' + "./npc{{.win}} -server=\"{{.wss_ip}}:{{.wss_p}}{{.ws_path}}\" -vkey=\"" + row.VerifyKey + "\" -type=\"wss\"</code>&emsp;<br/><br/>"
                 {{end}}
             return tmp
         },
