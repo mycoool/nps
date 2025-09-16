@@ -63,11 +63,7 @@ func NewAddrOverrideConn(base net.Conn, remote, local string) (*AddrOverrideConn
 	if err != nil {
 		return nil, fmt.Errorf("invalid remote addr %q: %w", remote, err)
 	}
-	lAddr, err := parseTCPAddrMaybe(local)
-	if err != nil {
-		lAddr = LocalTCPAddr
-		//return nil, fmt.Errorf("invalid local addr %q: %w", local, err)
-	}
+	lAddr, _ := parseTCPAddrMaybe(local)
 	return &AddrOverrideConn{
 		Conn:  base,
 		lAddr: lAddr,
