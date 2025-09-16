@@ -330,15 +330,17 @@ func NewConn(tp string, vkey string, server string, proxyUrl string) (*conn.Conn
 	} else {
 		alpn = strings.TrimSpace(strings.TrimPrefix(path, "/"))
 	}
-	server = EnsurePort(server, tp)
-	host := common.GetIpByAddr(server)
-	if !common.IsDomain(host) {
-		host = ""
+	addr, host := common.SplitAddrAndHost(server)
+	server = EnsurePort(addr, tp)
+	sni := common.GetIpByAddr(host)
+	if !common.IsDomain(sni) {
+		sni = ""
 	}
 	//logs.Debug("Server: %s Path: %s", server, path)
 	if HasFailed {
 		if s, e := common.GetFastAddr(server, tp); e == nil {
 			server = s
+			//logs.Debug("Fast Server: %s", server)
 		} else {
 			logs.Debug("Server: %s Path: %s Error: %v", server, path, e)
 		}
@@ -349,7 +351,10 @@ func NewConn(tp string, vkey string, server string, proxyUrl string) (*conn.Conn
 		connection, err = GetProxyConn(proxyUrl, server, timeout)
 	case "tls":
 		isTls = true
-		conf := &tls.Config{InsecureSkipVerify: true}
+		conf := &tls.Config{
+			InsecureSkipVerify: true,
+			ServerName:         sni,
+		}
 		rawConn, err := GetProxyConn(proxyUrl, server, timeout)
 		if err != nil {
 			return nil, "", err
@@ -359,14 +364,15 @@ func NewConn(tp string, vkey string, server string, proxyUrl string) (*conn.Conn
 			_ = rawConn.Close()
 			return nil, "", err
 		}
-		tlsFp, tlsVerify = VerifyTLS(connection, host)
+		tlsFp, tlsVerify = VerifyTLS(connection, sni)
 	case "ws":
 		rawConn, err := GetProxyConn(proxyUrl, server, timeout)
 		if err != nil {
 			return nil, "", err
 		}
 		urlStr := "ws://" + server + path
-		wsConn, _, err := conn.DialWS(rawConn, urlStr, timeout)
+		//logs.Debug("URL: %s", urlStr)
+		wsConn, _, err := conn.DialWS(rawConn, urlStr, host, timeout)
 		if err != nil {
 			_ = rawConn.Close()
 			return nil, "", err
@@ -375,24 +381,25 @@ func NewConn(tp string, vkey string, server string, proxyUrl string) (*conn.Conn
 	case "wss":
 		isTls = true
 		urlStr := "wss://" + server + path
+		//logs.Debug("URL: %s Host: %s SNI: %s", urlStr, host, sni)
 		rawConn, err := GetProxyConn(proxyUrl, server, timeout)
 		if err != nil {
 			return nil, "", err
 		}
-		wsConn, _, err := conn.DialWSS(rawConn, urlStr, timeout)
+		wsConn, _, err := conn.DialWSS(rawConn, urlStr, host, sni, timeout)
 		if err != nil {
 			_ = rawConn.Close()
 			return nil, "", err
 		}
 		if underlying := wsConn.NetConn(); underlying != nil {
-			tlsFp, tlsVerify = VerifyTLS(underlying, host)
+			tlsFp, tlsVerify = VerifyTLS(underlying, sni)
 		}
 		connection = conn.NewWsConn(wsConn)
 	case "quic":
 		isTls = true
 		tlsCfg := &tls.Config{
 			InsecureSkipVerify: true,
-			ServerName:         host,
+			ServerName:         sni,
 			NextProtos:         []string{alpn},
 		}
 		ctx := context.Background()
@@ -401,7 +408,7 @@ func NewConn(tp string, vkey string, server string, proxyUrl string) (*conn.Conn
 			return nil, "", fmt.Errorf("quic dial error: %w", err)
 		}
 		state := sess.ConnectionState().TLS
-		tlsFp, tlsVerify = VerifyState(state, host)
+		tlsFp, tlsVerify = VerifyState(state, sni)
 		stream, err := sess.OpenStreamSync(ctx)
 		if err != nil {
 			_ = sess.CloseWithError(0, "")

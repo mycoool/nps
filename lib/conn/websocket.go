@@ -165,27 +165,38 @@ func (hl *httpListener) Addr() net.Addr {
 	return hl.addr
 }
 
-func DialWS(rawConn net.Conn, urlStr string, timeout time.Duration) (*websocket.Conn, *http.Response, error) {
+func DialWS(rawConn net.Conn, urlStr, host string, timeout time.Duration) (*websocket.Conn, *http.Response, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
+	h := http.Header{}
+	if host != "" {
+		h.Set("Host", host)
+	}
 	dialer := websocket.Dialer{
 		HandshakeTimeout: timeout,
 		NetDialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			return rawConn, nil
 		},
 	}
-	return dialer.DialContext(ctx, urlStr, nil)
+	return dialer.DialContext(ctx, urlStr, h)
 }
 
-func DialWSS(rawConn net.Conn, urlStr string, timeout time.Duration) (*websocket.Conn, *http.Response, error) {
+func DialWSS(rawConn net.Conn, urlStr, host, sni string, timeout time.Duration) (*websocket.Conn, *http.Response, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
+	h := http.Header{}
+	if host != "" {
+		h.Set("Host", host)
+	}
 	dialer := websocket.Dialer{
 		HandshakeTimeout: timeout,
-		TLSClientConfig:  &tls.Config{InsecureSkipVerify: true},
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+			ServerName:         sni,
+		},
 		NetDialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			return rawConn, nil
 		},
 	}
-	return dialer.DialContext(ctx, urlStr, nil)
+	return dialer.DialContext(ctx, urlStr, h)
 }
