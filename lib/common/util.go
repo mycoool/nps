@@ -162,7 +162,12 @@ func SplitAddrAndHost(s string) (addr, host string) {
 	if index == -1 {
 		return s, s
 	}
-	return s[:index], s[index+1:]
+	addr = strings.TrimSpace(s[:index])
+	host = strings.TrimSpace(s[index+1:])
+	if host == "" {
+		host = addr
+	}
+	return
 }
 
 // GetHostByName Get the corresponding IP address through domain name
