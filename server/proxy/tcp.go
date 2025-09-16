@@ -56,7 +56,9 @@ func (s *TunnelModeServer) Close() error {
 }
 
 func (s *TunnelModeServer) ServeVirtual(c net.Conn) {
-	s.handleConn(c)
+	if c != nil {
+		go s.handleConn(c)
+	}
 }
 
 func (s *TunnelModeServer) DialVirtual(rAddr string) (net.Conn, error) {

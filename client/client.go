@@ -414,7 +414,7 @@ func (s *TRPClient) handleChan(src net.Conn) {
 		}
 		rwc := conn.GetConn(src, lk.Crypt, lk.Compress, nil, false, false)
 		c := conn.WrapConn(rwc, src)
-		vl.Deliver(c)
+		vl.ServeVirtual(c)
 		return
 	}
 	//host for target processing

@@ -638,6 +638,12 @@ func GetHostList(start, length, clientId int, search, sortField, order string) (
 		} else {
 			sort.SliceStable(list, func(i, j int) bool { return !list[i].HttpsJustProxy && list[j].HttpsJustProxy })
 		}
+	} else if sortField == "TlsOffload" {
+		if order == "asc" {
+			sort.SliceStable(list, func(i, j int) bool { return list[i].TlsOffload && !list[j].TlsOffload })
+		} else {
+			sort.SliceStable(list, func(i, j int) bool { return !list[i].TlsOffload && list[j].TlsOffload })
+		}
 	} else if sortField == "NowConn" {
 		if order == "asc" {
 			sort.SliceStable(list, func(i, j int) bool { return list[i].NowConn < list[j].NowConn })

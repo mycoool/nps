@@ -51,8 +51,8 @@ func (w *wrappedConn) SetWriteDeadline(t time.Time) error {
 
 type AddrOverrideConn struct {
 	net.Conn
-	lAddr *net.TCPAddr
-	rAddr *net.TCPAddr
+	lAddr net.Addr
+	rAddr net.Addr
 }
 
 func NewAddrOverrideConn(base net.Conn, remote, local string) (*AddrOverrideConn, error) {
@@ -65,7 +65,8 @@ func NewAddrOverrideConn(base net.Conn, remote, local string) (*AddrOverrideConn
 	}
 	lAddr, err := parseTCPAddrMaybe(local)
 	if err != nil {
-		return nil, fmt.Errorf("invalid local addr %q: %w", local, err)
+		lAddr = LocalTCPAddr
+		//return nil, fmt.Errorf("invalid local addr %q: %w", local, err)
 	}
 	return &AddrOverrideConn{
 		Conn:  base,
@@ -74,7 +75,7 @@ func NewAddrOverrideConn(base net.Conn, remote, local string) (*AddrOverrideConn
 	}, nil
 }
 
-func NewAddrOverrideFromTCP(base net.Conn, remote, local *net.TCPAddr) *AddrOverrideConn {
+func NewAddrOverrideFromAddr(base net.Conn, remote, local net.Addr) *AddrOverrideConn {
 	return &AddrOverrideConn{
 		Conn:  base,
 		lAddr: local,

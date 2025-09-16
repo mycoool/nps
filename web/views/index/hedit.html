@@ -95,6 +95,16 @@
                             <span class="help-block m-b-none" langtag="info-httpsjustproxy"></span>
                         </div>
                     </div>
+                    <div class="form-group" id="tls_offload">
+                        <label class="control-label font-bold" langtag="word-tlsoffload"></label>
+                        <div class="col-sm-12">
+                            <select class="form-control selectpicker" name="tls_offload">
+                                <option {{if eq false .h.TlsOffload}}selected{{end}} value="0" langtag="word-no"></option>
+                                <option {{if eq true .h.TlsOffload}}selected{{end}}  value="1" langtag="word-yes"></option>
+                            </select>
+                            <span class="help-block m-b-none" langtag="info-tlsoffload"></span>
+                        </div>
+                    </div>
                     <div class="form-group" id="proxy_protocol">
                         <label class="control-label font-bold" langtag="word-proxyprotocol"></label>
                         <div class="col-sm-12">
@@ -234,15 +244,18 @@
             $("#auto_https").css("display", "block")
             $("#https_just_proxy").css("display", "block")
             if ($("#https_just_proxy_select").val() == "1") {
+                $("#tls_offload").css("display", "none")
                 $("#auto_ssl").css("display", "none")
                 $("#cert_file").css("display", "none")
                 $("#key_file").css("display", "none")
             } else {
+                $("#tls_offload").css("display", "block")
                 $("#auto_ssl").css("display", "block")
                 $("#cert_file").css("display", "block")
                 $("#key_file").css("display", "block")
             }
         } else {
+            $("#tls_offload").css("display", "none")
             $("#auto_ssl").css("display", "none")
             $("#cert_file").css("display", "none")
             $("#key_file").css("display", "none")
@@ -288,15 +301,18 @@
                 $("#auto_https").css("display", "block")
                 $("#https_just_proxy").css("display", "block")
                 if ($("#https_just_proxy_select").val() == "1") {
+                    $("#tls_offload").css("display", "none")
                     $("#auto_ssl").css("display", "none")
                     $("#cert_file").css("display", "none")
                     $("#key_file").css("display", "none")
                 } else {
+                    $("#tls_offload").css("display", "block")
                     $("#auto_ssl").css("display", "block")
                     $("#cert_file").css("display", "block")
                     $("#key_file").css("display", "block")
                 }
             } else {
+                $("#tls_offload").css("display", "none")
                 $("#auto_ssl").css("display", "none")
                 $("#cert_file").css("display", "none")
                 $("#key_file").css("display", "none")
@@ -307,10 +323,12 @@
 
         $("#https_just_proxy_select").on("change", function () {
             if ($("#https_just_proxy_select").val() == "1") {
+                $("#tls_offload").css("display", "none")
                 $("#auto_ssl").css("display", "none")
                 $("#cert_file").css("display", "none")
                 $("#key_file").css("display", "none")
             } else {
+                $("#tls_offload").css("display", "block")
                 $("#auto_ssl").css("display", "block")
                 $("#cert_file").css("display", "block")
                 $("#key_file").css("display", "block")

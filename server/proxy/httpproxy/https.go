@@ -148,6 +148,10 @@ func (s *HttpsServer) Start() error {
 			_ = tlsConn.Close()
 			return
 		}
+		if host.TlsOffload {
+			s.handleTlsProxy(host, tlsConn, serverName)
+			return
+		}
 		s.httpsServeListener.acceptConn <- tlsConn
 	})
 	s.httpsStatus = false
@@ -208,6 +212,26 @@ func (s *HttpsServer) handleHttpsProxy(host *file.Host, c net.Conn, rb []byte, s
 	}
 	logs.Info("New HTTPS connection, clientId %d, host %s, remote address %v", host.Client.Id, sni, c.RemoteAddr())
 	_ = s.DealClient(conn.NewConn(c), host.Client, targetAddr, rb, common.CONN_TCP, nil, []*file.Flow{host.Flow, host.Client.Flow}, host.Target.ProxyProtocol, host.Target.LocalProxy, nil)
+}
+
+func (s *HttpsServer) handleTlsProxy(host *file.Host, tlsConn net.Conn, sni string) {
+	if err := s.CheckFlowAndConnNum(host.Client); err != nil {
+		logs.Debug("Client id %d, host id %d, TLS-only check failed: %v", host.Client.Id, host.Id, err)
+		_ = tlsConn.Close()
+		return
+	}
+	defer host.Client.CutConn()
+	host.AddConn()
+	defer host.CutConn()
+
+	targetAddr, err := host.Target.GetRandomTarget()
+	if err != nil {
+		logs.Warn("%v", err)
+		_ = tlsConn.Close()
+		return
+	}
+	logs.Info("New TLS-only connection, clientId %d, host %s, remote %v -> %s", host.Client.Id, sni, tlsConn.RemoteAddr(), targetAddr)
+	_ = s.DealClient(conn.NewConn(tlsConn), host.Client, targetAddr, nil, common.CONN_TCP, nil, []*file.Flow{host.Flow, host.Client.Flow}, host.Target.ProxyProtocol, host.Target.LocalProxy, nil)
 }
 
 func (s *HttpsServer) Close() error {

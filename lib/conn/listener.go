@@ -3,7 +3,7 @@ package conn
 import (
 	"context"
 	"crypto/tls"
-	"errors"
+	"fmt"
 	"io"
 	"net"
 	"strings"
@@ -127,16 +127,26 @@ func (l *OneConnListener) Addr() net.Addr {
 }
 
 type VirtualListener struct {
-	conns  chan net.Conn
-	closed chan struct{}
-	addr   net.Addr
+	conns     chan net.Conn
+	closed    chan struct{}
+	addr      net.Addr
+	closeOnce sync.Once
 }
 
 func NewVirtualListener(addr net.Addr) *VirtualListener {
+	if addr == nil {
+		addr = LocalTCPAddr
+	}
 	return &VirtualListener{
 		conns:  make(chan net.Conn, 1024),
 		closed: make(chan struct{}),
 		addr:   addr,
+	}
+}
+
+func (l *VirtualListener) SetAddr(addr net.Addr) {
+	if addr != nil {
+		l.addr = addr
 	}
 }
 
@@ -146,34 +156,59 @@ func (l *VirtualListener) Addr() net.Addr {
 
 func (l *VirtualListener) Accept() (net.Conn, error) {
 	select {
+	case <-l.closed:
+		return nil, net.ErrClosed
+	default:
+	}
+	select {
 	case c := <-l.conns:
 		return c, nil
 	case <-l.closed:
-		return nil, errors.New("listener closed")
+		return nil, net.ErrClosed
 	}
 }
 
 func (l *VirtualListener) Close() error {
-	select {
-	case <-l.closed:
-		return nil
-	default:
+	l.closeOnce.Do(func() {
 		close(l.closed)
-	}
-	for {
-		select {
-		case c := <-l.conns:
-			_ = c.Close()
-		default:
-			return nil
+		for {
+			select {
+			case c := <-l.conns:
+				if c != nil {
+					_ = c.Close()
+				}
+			default:
+				return
+			}
 		}
-	}
+	})
+	return nil
 }
 
-func (l *VirtualListener) Deliver(c net.Conn) {
+func (l *VirtualListener) ServeVirtual(c net.Conn) {
 	select {
 	case <-l.closed:
 		_ = c.Close()
 	case l.conns <- c:
+	default:
+		_ = c.Close()
 	}
+}
+
+func (l *VirtualListener) DialVirtual(rAddr string) (net.Conn, error) {
+	select {
+	case <-l.closed:
+		return nil, net.ErrClosed
+	default:
+	}
+	a, b := net.Pipe()
+	remoteAddr, err := parseTCPAddrMaybe(rAddr)
+	if err != nil || remoteAddr == nil {
+		_ = a.Close()
+		_ = b.Close()
+		return nil, fmt.Errorf("invalid remote addr %q: %w", rAddr, err)
+	}
+	c := NewAddrOverrideFromAddr(b, remoteAddr, l.addr)
+	l.ServeVirtual(c)
+	return a, nil
 }

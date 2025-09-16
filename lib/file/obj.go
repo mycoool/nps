@@ -253,6 +253,7 @@ type Host struct {
 	Scheme           string //http https all
 	RedirectURL      string // 307
 	HttpsJustProxy   bool
+	TlsOffload       bool
 	AutoSSL          bool
 	CertType         string
 	CertHash         string

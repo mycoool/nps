@@ -1,7 +1,6 @@
 package server
 
 import (
-	"errors"
 	"net"
 	"net/http"
 	"path/filepath"
@@ -10,9 +9,11 @@ import (
 	"github.com/beego/beego"
 	"github.com/djylb/nps/bridge"
 	"github.com/djylb/nps/lib/common"
+	"github.com/djylb/nps/lib/conn"
 	"github.com/djylb/nps/lib/logs"
 	"github.com/djylb/nps/server/connection"
 	"github.com/djylb/nps/server/proxy"
+	"github.com/djylb/nps/server/tool"
 )
 
 var _ = unsafe.Sizeof(0)
@@ -24,35 +25,61 @@ func initBeforeHTTPRun()
 
 type WebServer struct {
 	proxy.BaseServer
+	tcpListener net.Listener
 }
 
 func (s *WebServer) Start() error {
-	p, _ := beego.AppConfig.Int("web_port")
-	if p == 0 {
-		stop := make(chan struct{})
-		<-stop
-	}
+	ip := beego.AppConfig.DefaultString("web_ip", "0.0.0.0")
+	p := beego.AppConfig.DefaultInt("web_port", 0)
+
 	beego.BConfig.WebConfig.Session.SessionOn = true
 	beego.SetStaticPath(beego.AppConfig.String("web_base_url")+"/static", filepath.Join(common.GetRunPath(), "web", "static"))
 	beego.SetViewsPath(filepath.Join(common.GetRunPath(), "web", "views"))
-	err := errors.New("Web management startup failure ")
-	var l net.Listener
-	if l, err = connection.GetWebManagerListener(); err == nil {
-		initBeforeHTTPRun()
-		if beego.AppConfig.String("web_open_ssl") == "true" {
-			keyPath := beego.AppConfig.String("web_key_file")
-			certPath := beego.AppConfig.String("web_cert_file")
-			err = http.ServeTLS(l, beego.BeeApp.Handlers, certPath, keyPath)
+	initBeforeHTTPRun()
+
+	if tool.WebServerListener != nil {
+		_ = tool.WebServerListener.Close()
+		tool.WebServerListener = nil
+	}
+	lAddr := &net.TCPAddr{IP: net.ParseIP(ip), Port: p}
+	tool.WebServerListener = conn.NewVirtualListener(lAddr)
+
+	errCh := make(chan error, 2)
+
+	go func() {
+		errCh <- http.Serve(tool.WebServerListener, beego.BeeApp.Handlers)
+	}()
+
+	if p > 0 {
+		if l, err := connection.GetWebManagerListener(); err == nil {
+			s.tcpListener = l
+			go func() {
+				if beego.AppConfig.String("web_open_ssl") == "true" {
+					keyPath := beego.AppConfig.String("web_key_file")
+					certPath := beego.AppConfig.String("web_cert_file")
+					errCh <- http.ServeTLS(l, beego.BeeApp.Handlers, certPath, keyPath)
+				} else {
+					errCh <- http.Serve(l, beego.BeeApp.Handlers)
+				}
+			}()
 		} else {
-			err = http.Serve(l, beego.BeeApp.Handlers)
+			logs.Error("%v", err)
 		}
 	} else {
-		logs.Error("%v", err)
+		logs.Info("web_port=0: only virtual listener is active (plain HTTP)")
 	}
-	return err
+
+	return <-errCh
 }
 
 func (s *WebServer) Close() error {
+	if s.tcpListener != nil {
+		_ = s.tcpListener.Close()
+	}
+	if tool.WebServerListener != nil {
+		_ = tool.WebServerListener.Close()
+		tool.WebServerListener = nil
+	}
 	return nil
 }
 

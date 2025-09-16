@@ -38,18 +38,22 @@ var (
 )
 
 type Bridge struct {
-	TunnelPort     int
-	Client         *sync.Map
-	Register       *sync.Map
-	tunnelType     string //bridge type kcp or tcp
-	OpenHost       chan *file.Host
-	OpenTask       chan *file.Tunnel
-	CloseTask      chan *file.Tunnel
-	CloseClient    chan int
-	SecretChan     chan *conn.Secret
-	ipVerify       bool
-	runList        *sync.Map //map[int]interface{}
-	disconnectTime int
+	TunnelPort         int
+	Client             *sync.Map
+	Register           *sync.Map
+	tunnelType         string //bridge type kcp or tcp
+	VirtualTcpListener *conn.VirtualListener
+	VirtualTlsListener *conn.VirtualListener
+	VirtualWsListener  *conn.VirtualListener
+	VirtualWssListener *conn.VirtualListener
+	OpenHost           chan *file.Host
+	OpenTask           chan *file.Tunnel
+	CloseTask          chan *file.Tunnel
+	CloseClient        chan int
+	SecretChan         chan *conn.Secret
+	ipVerify           bool
+	runList            *sync.Map //map[int]interface{}
+	disconnectTime     int
 }
 
 func NewTunnel(tunnelPort int, tunnelType string, ipVerify bool, runList *sync.Map, disconnectTime int) *Bridge {
@@ -72,6 +76,10 @@ func NewTunnel(tunnelPort int, tunnelType string, ipVerify bool, runList *sync.M
 func (s *Bridge) StartTunnel() error {
 	go s.ping()
 	// tcp
+	s.VirtualTcpListener = conn.NewVirtualListener(nil)
+	go conn.Accept(s.VirtualTcpListener, func(c net.Conn) {
+		s.cliProcess(conn.NewConn(c), common.CONN_TCP)
+	})
 	if ServerTcpEnable {
 		go func() {
 			listener, err := connection.GetBridgeTcpListener()
@@ -80,13 +88,16 @@ func (s *Bridge) StartTunnel() error {
 				os.Exit(0)
 				return
 			}
-			conn.Accept(listener, func(c net.Conn) {
-				s.cliProcess(conn.NewConn(c), "tcp")
-			})
+			s.VirtualTcpListener.SetAddr(listener.Addr())
+			conn.Accept(listener, s.VirtualTcpListener.ServeVirtual)
 		}()
 	}
 
 	// tls
+	s.VirtualTlsListener = conn.NewVirtualListener(nil)
+	go conn.Accept(s.VirtualTlsListener, func(c net.Conn) {
+		s.cliProcess(conn.NewConn(tls.Server(c, &tls.Config{Certificates: []tls.Certificate{crypt.GetCert()}})), common.CONN_TLS)
+	})
 	if ServerTlsEnable {
 		go func() {
 			tlsListener, tlsErr := connection.GetBridgeTlsListener()
@@ -95,13 +106,17 @@ func (s *Bridge) StartTunnel() error {
 				os.Exit(0)
 				return
 			}
-			conn.Accept(tlsListener, func(c net.Conn) {
-				s.cliProcess(conn.NewConn(tls.Server(c, &tls.Config{Certificates: []tls.Certificate{crypt.GetCert()}})), "tls")
-			})
+			s.VirtualTlsListener.SetAddr(tlsListener.Addr())
+			conn.Accept(tlsListener, s.VirtualTlsListener.ServeVirtual)
 		}()
 	}
 
 	// ws
+	s.VirtualWsListener = conn.NewVirtualListener(nil)
+	wsLn := conn.NewWSListener(s.VirtualWsListener, connection.BridgePath, connection.BridgeTrustedIps, connection.BridgeRealIpHeader)
+	go conn.Accept(wsLn, func(c net.Conn) {
+		s.cliProcess(conn.NewConn(c), common.CONN_WS)
+	})
 	if ServerWsEnable {
 		go func() {
 			wsListener, wsErr := connection.GetBridgeWsListener()
@@ -110,14 +125,17 @@ func (s *Bridge) StartTunnel() error {
 				os.Exit(0)
 				return
 			}
-			wsLn := conn.NewWSListener(wsListener, connection.BridgePath, connection.BridgeTrustedIps, connection.BridgeRealIpHeader)
-			conn.Accept(wsLn, func(c net.Conn) {
-				s.cliProcess(conn.NewConn(c), "ws")
-			})
+			s.VirtualWsListener.SetAddr(wsListener.Addr())
+			conn.Accept(wsListener, s.VirtualWsListener.ServeVirtual)
 		}()
 	}
 
 	// wss
+	s.VirtualWssListener = conn.NewVirtualListener(nil)
+	wssLn := conn.NewWSSListener(s.VirtualWssListener, connection.BridgePath, crypt.GetCert(), connection.BridgeTrustedIps, connection.BridgeRealIpHeader)
+	go conn.Accept(wssLn, func(c net.Conn) {
+		s.cliProcess(conn.NewConn(c), common.CONN_WSS)
+	})
 	if ServerWssEnable {
 		go func() {
 			wssListener, wssErr := connection.GetBridgeWssListener()
@@ -126,13 +144,10 @@ func (s *Bridge) StartTunnel() error {
 				os.Exit(0)
 				return
 			}
-			wssLn := conn.NewWSSListener(wssListener, connection.BridgePath, crypt.GetCert(), connection.BridgeTrustedIps, connection.BridgeRealIpHeader)
-			conn.Accept(wssLn, func(c net.Conn) {
-				s.cliProcess(conn.NewConn(c), "wss")
-			})
+			s.VirtualWssListener.SetAddr(wssListener.Addr())
+			conn.Accept(wssListener, s.VirtualWssListener.ServeVirtual)
 		}()
 	}
-
 	// kcp
 	if ServerKcpEnable {
 		logs.Info("Server start, the bridge type is kcp, the bridge port is %s", connection.BridgeKcpPort)
@@ -832,6 +847,19 @@ func (s *Bridge) SendLinkInfo(clientId int, link *conn.Link, t *file.Tunnel) (ta
 		return nil, errors.New("link is nil")
 	}
 
+	// If IP is restricted, do IP verification
+	if s.ipVerify {
+		ip := common.GetIpByAddr(link.RemoteAddr)
+		ipValue, ok := s.Register.Load(ip)
+		if !ok {
+			return nil, fmt.Errorf("the ip %s is not in the validation list", ip)
+		}
+
+		if !ipValue.(time.Time).After(time.Now()) {
+			return nil, fmt.Errorf("the validity of the ip %s has expired", ip)
+		}
+	}
+
 	clientValue, ok := s.Client.Load(clientId)
 	if !ok {
 		err = fmt.Errorf("the client %d is not connect", clientId)
@@ -845,17 +873,45 @@ func (s *Bridge) SendLinkInfo(clientId int, link *conn.Link, t *file.Tunnel) (ta
 			go conn.HandleUdp5(context.Background(), handlerSide, link.Option.Timeout)
 			return serverSide, nil
 		}
-		if strings.Contains(link.Host, "tunnel://") {
-			key := strings.TrimPrefix(strings.TrimSpace(link.Host), "tunnel://")
-			var id int
-			id, err = strconv.Atoi(key)
-			if err != nil {
-				return nil, err
+		raw := strings.TrimSpace(link.Host)
+		if raw == "" {
+			return nil, fmt.Errorf("empty host")
+		}
+		if idx := strings.Index(raw, "://"); idx >= 0 {
+			scheme := strings.ToLower(strings.TrimSpace(raw[:idx]))
+			targetStr := strings.TrimSpace(raw[idx+3:])
+			if targetStr == "" {
+				return nil, fmt.Errorf("missing target in %q", raw)
 			}
-			if t != nil && t.Id == id {
-				return nil, fmt.Errorf("task %d cannot connect to itself (tunnel://%d)", t.Id, id)
+			switch scheme {
+			case "tunnel":
+				id, convErr := strconv.Atoi(targetStr)
+				if convErr != nil {
+					return nil, fmt.Errorf("invalid tunnel id %q: %w", targetStr, convErr)
+				}
+				if t != nil && t.Id == id {
+					return nil, fmt.Errorf("task %d cannot connect to itself (tunnel://%d)", t.Id, id)
+				}
+				return tool.GetTunnelConn(id, link.RemoteAddr)
+			case "bridge":
+				// bridge://tcp|tls|ws|wss|web
+				switch strings.ToLower(targetStr) {
+				case common.CONN_TCP:
+					return s.VirtualTcpListener.DialVirtual(link.RemoteAddr)
+				case common.CONN_TLS:
+					return s.VirtualTlsListener.DialVirtual(link.RemoteAddr)
+				case common.CONN_WS:
+					return s.VirtualWsListener.DialVirtual(link.RemoteAddr)
+				case common.CONN_WSS:
+					return s.VirtualWssListener.DialVirtual(link.RemoteAddr)
+				case common.CONN_WEB:
+					return tool.GetWebServerConn(link.RemoteAddr)
+				default:
+					return nil, fmt.Errorf("invalid bridge target %q in %q", targetStr, raw)
+				}
+			default:
+				return nil, fmt.Errorf("unsupported scheme %q in %q", scheme, raw)
 			}
-			return tool.GetTunnelConn(id, link.RemoteAddr)
 		}
 		network := "tcp"
 		if link.ConnType == common.CONN_UDP {
@@ -866,18 +922,6 @@ func (s *Bridge) SendLinkInfo(clientId int, link *conn.Link, t *file.Tunnel) (ta
 	}
 
 	client := clientValue.(*Client)
-	// If IP is restricted, do IP verification
-	if s.ipVerify {
-		ip := common.GetIpByAddr(link.RemoteAddr)
-		ipValue, ok := s.Register.Load(ip)
-		if !ok {
-			return nil, fmt.Errorf("the ip %s is not in the validation list", ip)
-		}
-
-		if !ipValue.(time.Time).After(time.Now()) {
-			return nil, fmt.Errorf("the validity of the ip %s has expired", ip)
-		}
-	}
 
 	var tunnel any
 	var node *Node

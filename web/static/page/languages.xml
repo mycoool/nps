@@ -381,12 +381,20 @@
 	<lang id="word-https">HTTPS
 	</lang>
 	<lang id="word-httpsjustproxy">
-		<zh-CN>由后端处理HTTPS (仅转发)</zh-CN>
-		<en-US>Handle HTTPS by the backend (only forwarding)</en-US>
+		<zh-CN>TLS 直通（由后端解密）</zh-CN>
+		<en-US>TLS passthrough (backend decrypts)</en-US>
 	</lang>
 	<lang id="word-httpsjustproxytitle">
-		<zh-CN>HTTPS仅转发</zh-CN>
-		<en-US>HTTPS only forwarding</en-US>
+		<zh-CN>TLS直通</zh-CN>
+		<en-US>TLS passthrough</en-US>
+	</lang>
+	<lang id="word-tlsoffload">
+		<zh-CN>TLS 终止（解密转发）</zh-CN>
+		<en-US>TLS termination (decrypted relay)</en-US>
+	</lang>
+	<lang id="word-tlsoffloadtitle">
+		<zh-CN>TLS终止</zh-CN>
+		<en-US>TLS termination</en-US>
 	</lang>
 	<lang id="word-autohttps">
 		<zh-CN>自动HTTPS (301)</zh-CN>
@@ -894,8 +902,12 @@
 		<en-US>Colon separated, multiple lines please fill in</en-US>
 	</lang>
 	<lang id="info-httpsjustproxy">
-		<zh-CN>按首个 TLS 握手包的 SNI 分流。注意：当后端支持 H2 时，浏览器可能复用连接导致串站。</zh-CN>
-		<en-US>Routes by the SNI from the first TLS handshake. Note: when the backend supports H2, browsers may reuse the connection and cause misrouting.</en-US>
+		<zh-CN>按域名（SNI）分流；不在此解密 TLS，数据原样转给后端。提示：后端启用 HTTP/2 时，浏览器可能复用连接，导致偶发串站。</zh-CN>
+		<en-US>Route by domain (SNI). No TLS decryption here; traffic is forwarded unchanged to the backend. Note: with HTTP/2 backends, browsers may reuse a connection and cause misrouting.</en-US>
+	</lang>
+	<lang id="info-tlsoffload">
+		<zh-CN>按域名（SNI）分流；仅处理 TLS 握手，将解密后的数据转发给后端。</zh-CN>
+		<en-US>Route by domain (SNI); handle only the TLS handshake, then forward the decrypted data to the backend.</en-US>
 	</lang>
 	<lang id="info-identificationkey">
 		<zh-CN>P2P连接和私密代理模式需要</zh-CN>

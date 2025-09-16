@@ -81,6 +81,7 @@
                 + '<b langtag="word-compatmode"></b>: <span onclick="submitform(\'turn\', \'{{.web_base_url}}/index/clearhost\', {\'id\':' + row.Id + ', \'mode\': \'compat_mode\'})" langtag="word-' + row.CompatMode + '"></span>&emsp;'
                 + '<b langtag="word-proxyprotocoltitle"></b>: <span langtag="word-proxyprotocolv' + row.Target.ProxyProtocol + '"></span>&emsp;'
                 + '<b langtag="word-httpsjustproxytitle"></b>: <span onclick="submitform(\'turn\', \'{{.web_base_url}}/index/clearhost\', {\'id\':' + row.Id + ', \'mode\': \'https_just_proxy\'})" langtag="word-' + row.HttpsJustProxy + '"></span>&emsp;'
+                + '<b langtag="word-tlsoffloadtitle"></b>: <span onclick="submitform(\'turn\', \'{{.web_base_url}}/index/clearhost\', {\'id\':' + row.Id + ', \'mode\': \'tls_offload\'})" langtag="word-' + row.TlsOffload + '"></span>&emsp;'
                 + '<b langtag="word-targettype"></b>: <span onclick="submitform(\'turn\', \'{{.web_base_url}}/index/clearhost\', {\'id\':' + row.Id + ', \'mode\': \'target_is_https\'})" langtag="word-ishttps' + row.TargetIsHttps + '"></span>&emsp;<br/><br>'
             if (row.Client.Cnf.U || row.Client.Cnf.P) {
                 tmp += '<b langtag="word-basicusername"></b>: <span onclick="oCopy(this)">' + row.Client.Cnf.U + '</span>&emsp;'
@@ -228,6 +229,20 @@
                         return '<span langtag="word-' + value + '" onclick="submitform(\'stop\', \'{{.web_base_url}}/index/stophost\', {\'id\':' + row.Id + ', \'mode\': \'https_just_proxy\'})"></span>'
                     } else {
                         return '<span langtag="word-' + value + '" onclick="submitform(\'start\', \'{{.web_base_url}}/index/starthost\', {\'id\':' + row.Id + ', \'mode\': \'https_just_proxy\'})"></span>'
+                    }
+                }
+            },
+            {
+                field: 'TlsOffload', //域值
+                title: '<span langtag="word-tlsoffloadtitle"></span>', //标题
+                halign: 'center',
+                visible: false, //false表示不显示
+                sortable: true, //启用排序
+                formatter: function (value, row, index) {
+                    if (value) {
+                        return '<span langtag="word-' + value + '" onclick="submitform(\'stop\', \'{{.web_base_url}}/index/stophost\', {\'id\':' + row.Id + ', \'mode\': \'tls_offload\'})"></span>'
+                    } else {
+                        return '<span langtag="word-' + value + '" onclick="submitform(\'start\', \'{{.web_base_url}}/index/starthost\', {\'id\':' + row.Id + ', \'mode\': \'tls_offload\'})"></span>'
                     }
                 }
             },
