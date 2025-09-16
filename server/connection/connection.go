@@ -15,6 +15,7 @@ import (
 
 var pMux *pmux.PortMux
 var BridgeIp string
+var BridgeHost string
 var BridgeTcpIp string
 var BridgeKcpIp string
 var BridgeQuicIp string
@@ -47,6 +48,7 @@ var MuxPingIntervalSec int
 
 func InitConnectionService() {
 	BridgeIp = beego.AppConfig.DefaultString("bridge_ip", beego.AppConfig.String("bridge_tcp_ip"))
+	BridgeHost = beego.AppConfig.DefaultString("bridge_host", "")
 	BridgeTcpIp = beego.AppConfig.DefaultString("bridge_tcp_ip", BridgeIp)
 	BridgeKcpIp = beego.AppConfig.DefaultString("bridge_kcp_ip", BridgeIp)
 	BridgeQuicIp = beego.AppConfig.DefaultString("bridge_quic_ip", BridgeIp)

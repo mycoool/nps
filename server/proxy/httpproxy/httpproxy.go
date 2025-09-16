@@ -35,6 +35,7 @@ type HttpProxy struct {
 	HttpPortStr    string
 	HttpsPortStr   string
 	Http3PortStr   string
+	Http3Bridge    bool
 	ErrorAlways    bool
 	Magic          *certmagic.Config
 	Acme           *certmagic.ACMEIssuer
@@ -52,6 +53,7 @@ func NewHttpProxy(bridge proxy.NetBridge, task *file.Tunnel, httpPort, httpsPort
 		HttpPortStr:    strconv.Itoa(httpPort),
 		HttpsPortStr:   strconv.Itoa(httpsPort),
 		Http3PortStr:   strconv.Itoa(http3Port),
+		Http3Bridge:    false,
 	}
 	return httpProxy
 }
@@ -63,6 +65,10 @@ func (s *HttpProxy) Start() error {
 		s.ErrorContent = []byte("nps 404")
 	}
 	s.ErrorAlways = beego.AppConfig.DefaultBool("error_always", false)
+
+	if s.Bridge.IsServer() {
+		s.Http3Bridge = beego.AppConfig.DefaultBool("bridge_http3", true)
+	}
 
 	certmagic.Default.Logger = logs.ZapLogger
 	certmagic.DefaultACME.Agreed = true

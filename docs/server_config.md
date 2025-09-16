@@ -86,6 +86,7 @@ nps.exe -conf_path=D:\test\nps
 | `bridge_host`               | 客户端与服务端通信域名 （端口复用时使用）                                                                   |
 | `bridge_cert_file`          | 客户端与服务端通信 TLS 证书文件路径                                                                    |
 | `bridge_key_file`           | 客户端与服务端通信 TLS 证书密钥文件路径                                                                  |
+| `bridge_http3`              | 客户端与服务端通信允许通过 HTTP/3 端口连接                                                               |
 | `bridge_select_mode`        | 相同`vkey`客户端连接选取模式（主备：`0`/`Primary`/`p`，轮询：`1`/`RoundRobin`/`rr`，随机：`2`/`Random`/`rand`） |
 | `quic_alpn`                 | QUIC 握手时允许协商的 ALPN 列表，逗号分隔（默认 `nps`）                                                    |
 | `quic_keep_alive_period`    | QUIC 空闲保活周期（单位：s，默认 `10`）                                                               |

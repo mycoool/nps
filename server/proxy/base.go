@@ -22,6 +22,7 @@ type Service interface {
 type NetBridge interface {
 	SendLinkInfo(clientId int, link *conn.Link, t *file.Tunnel) (target net.Conn, err error)
 	IsServer() bool
+	CliProcess(c *conn.Conn, tunnelType string)
 }
 
 // BaseServer struct

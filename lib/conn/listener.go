@@ -57,6 +57,7 @@ func NewQuicListenerAndProcess(addr string, tlsConfig *tls.Config, quicConfig *q
 		stream, err := sess.AcceptStream(context.Background())
 		if err != nil {
 			logs.Trace("QUIC accept stream error: %v", err)
+			_ = sess.CloseWithError(0, "closed")
 			continue
 		}
 		conn := NewQuicAutoCloseConn(stream, sess)

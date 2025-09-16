@@ -258,6 +258,10 @@ func (b *P2pBridge) IsServer() bool {
 	return false
 }
 
+func (b *P2pBridge) CliProcess(*conn.Conn, string) {
+	return
+}
+
 func (mgr *P2PManager) StartLocalServer(l *config.LocalServer) error {
 	if mgr.ctx.Err() != nil {
 		return errors.New("parent context canceled")
