@@ -121,9 +121,11 @@ func (s *BaseController) display(tpl ...string) {
 	if wsPath := beego.AppConfig.String("bridge_path"); wsPath != "" {
 		s.Data["ws_path"] = beego.AppConfig.DefaultString("bridge_show_path", wsPath)
 		if beego.AppConfig.DefaultBool("bridge_ws_show", bridge.ServerWsEnable) {
+			s.Data["ws_ip"] = beego.AppConfig.DefaultString("bridge_ws_show_ip", ip)
 			s.Data["ws_p"] = beego.AppConfig.DefaultString("bridge_ws_show_port", beego.AppConfig.String("bridge_ws_port"))
 		}
 		if beego.AppConfig.DefaultBool("bridge_wss_show", bridge.ServerWssEnable) {
+			s.Data["wss_ip"] = beego.AppConfig.DefaultString("bridge_wss_show_ip", ip)
 			s.Data["wss_p"] = beego.AppConfig.DefaultString("bridge_wss_show_port", beego.AppConfig.String("bridge_wss_port"))
 		}
 	}
