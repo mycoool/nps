@@ -150,11 +150,11 @@ func (s *Bridge) StartTunnel() error {
 	}
 	// kcp
 	if ServerKcpEnable {
-		logs.Info("Server start, the bridge type is kcp, the bridge port is %s", connection.BridgeKcpPort)
+		logs.Info("Server start, the bridge type is kcp, the bridge port is %d", connection.BridgeKcpPort)
 		go func() {
 			bridgeKcp := *s
 			bridgeKcp.tunnelType = "kcp"
-			err := conn.NewKcpListenerAndProcess(common.BuildAddress(connection.BridgeKcpIp, connection.BridgeKcpPort), func(c net.Conn) {
+			err := conn.NewKcpListenerAndProcess(common.BuildAddress(connection.BridgeKcpIp, strconv.Itoa(connection.BridgeKcpPort)), func(c net.Conn) {
 				bridgeKcp.CliProcess(conn.NewConn(c), "kcp")
 			})
 			if err != nil {
@@ -165,7 +165,7 @@ func (s *Bridge) StartTunnel() error {
 
 	// quic
 	if ServerQuicEnable {
-		logs.Info("Server start, the bridge type is quic, the bridge port is %s", connection.BridgeQuicPort)
+		logs.Info("Server start, the bridge type is quic, the bridge port is %d", connection.BridgeQuicPort)
 
 		quicConfig := &quic.Config{
 			KeepAlivePeriod:    time.Duration(connection.QuicKeepAliveSec) * time.Second,
@@ -177,7 +177,7 @@ func (s *Bridge) StartTunnel() error {
 				Certificates: []tls.Certificate{crypt.GetCert()},
 			}
 			tlsCfg.NextProtos = connection.QuicAlpn
-			addr := common.BuildAddress(connection.BridgeQuicIp, connection.BridgeQuicPort)
+			addr := common.BuildAddress(connection.BridgeQuicIp, strconv.Itoa(connection.BridgeQuicPort))
 			err := conn.NewQuicListenerAndProcess(addr, tlsCfg, quicConfig, func(c net.Conn) {
 				s.CliProcess(conn.NewConn(c), "quic")
 			})
@@ -776,17 +776,17 @@ func (s *Bridge) typeDeal(c *conn.Conn, id, ver int, vs string, first bool) {
 			return
 		}
 		serverPort := connection.P2pPort
-		if serverPort == "" {
+		if serverPort == 0 {
 			logs.Warn("get local udp addr error")
 			_ = c.Close()
 			return
 		}
 		serverIP := common.GetServerIp(connection.P2pIp)
-		svrAddr := common.BuildAddress(serverIP, serverPort)
-		signalAddr := common.BuildAddress(serverIP, serverPort)
+		svrAddr := common.BuildAddress(serverIP, strconv.Itoa(serverPort))
+		signalAddr := common.BuildAddress(serverIP, strconv.Itoa(serverPort))
 		remoteIP := net.ParseIP(common.GetIpByAddr(c.RemoteAddr().String()))
 		if remoteIP != nil && (remoteIP.IsPrivate() || remoteIP.IsLoopback() || remoteIP.IsLinkLocalUnicast()) {
-			svrAddr = common.BuildAddress(common.GetIpByAddr(c.LocalAddr().String()), serverPort)
+			svrAddr = common.BuildAddress(common.GetIpByAddr(c.LocalAddr().String()), strconv.Itoa(serverPort))
 		}
 		client := v.(*Client)
 		node := client.GetNode()
@@ -803,7 +803,7 @@ func (s *Bridge) typeDeal(c *conn.Conn, id, ver int, vs string, first bool) {
 		}
 		signalIP := net.ParseIP(common.GetIpByAddr(signal.RemoteAddr().String()))
 		if signalIP != nil && (signalIP.IsPrivate() || signalIP.IsLoopback() || signalIP.IsLinkLocalUnicast()) {
-			signalAddr = common.BuildAddress(common.GetIpByAddr(signal.LocalAddr().String()), serverPort)
+			signalAddr = common.BuildAddress(common.GetIpByAddr(signal.LocalAddr().String()), strconv.Itoa(serverPort))
 		}
 		_, _ = signal.BufferWrite([]byte(common.NEW_UDP_CONN))
 		_ = signal.WriteLenContent([]byte(signalAddr))

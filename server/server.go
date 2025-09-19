@@ -229,9 +229,9 @@ func NewMode(Bridge *bridge.Bridge, c *file.Tunnel) proxy.Service {
 		_ = AddTask(t)
 		service = NewWebServer(Bridge)
 	case "httpHostServer":
-		httpPort, _ := beego.AppConfig.Int("http_proxy_port")
-		httpsPort, _ := beego.AppConfig.Int("https_proxy_port")
-		http3Port := beego.AppConfig.DefaultInt("http3_proxy_port", httpsPort)
+		httpPort := connection.HttpPort
+		httpsPort := connection.HttpsPort
+		http3Port := connection.Http3Port
 		//useCache, _ := beego.AppConfig.Bool("http_cache")
 		//cacheLen, _ := beego.AppConfig.Int("http_cache_length")
 		addOrigin, _ := beego.AppConfig.Bool("http_add_origin_header")
@@ -1182,7 +1182,7 @@ func GetDashboardData(force bool) map[string]interface{} {
 	data["serverIpv6"] = common.GetOutboundIPv6().String()
 	data["p2pIp"] = connection.P2pIp
 	data["p2pPort"] = connection.P2pPort
-	data["p2pAddr"] = common.JoinHostPort(common.GetServerIp(connection.P2pIp), connection.P2pPort)
+	data["p2pAddr"] = common.JoinHostPort(common.GetServerIp(connection.P2pIp), strconv.Itoa(connection.P2pPort))
 	data["logLevel"] = beego.AppConfig.String("log_level")
 	data["upTime"] = common.GetRunTime()
 	data["upSecs"] = common.GetRunSecs()

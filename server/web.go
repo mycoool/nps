@@ -29,8 +29,8 @@ type WebServer struct {
 }
 
 func (s *WebServer) Start() error {
-	ip := beego.AppConfig.DefaultString("web_ip", "0.0.0.0")
-	p := beego.AppConfig.DefaultInt("web_port", 0)
+	ip := connection.WebIp
+	p := connection.WebPort
 
 	beego.BConfig.WebConfig.Session.SessionOn = true
 	beego.SetStaticPath(beego.AppConfig.String("web_base_url")+"/static", filepath.Join(common.GetRunPath(), "web", "static"))
