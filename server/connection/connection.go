@@ -62,7 +62,7 @@ func InitConnectionService() {
 	BridgeTlsPort = beego.AppConfig.DefaultString("bridge_tls_port", beego.AppConfig.String("tls_bridge_port"))
 	BridgeWsPort = beego.AppConfig.String("bridge_ws_port")
 	BridgeWssPort = beego.AppConfig.String("bridge_wss_port")
-	BridgePath = beego.AppConfig.String("bridge_path")
+	BridgePath = beego.AppConfig.DefaultString("bridge_path", "/ws")
 	BridgeTrustedIps = beego.AppConfig.String("bridge_trusted_ips")
 	BridgeRealIpHeader = beego.AppConfig.String("bridge_real_ip_header")
 	HttpIp = beego.AppConfig.String("http_proxy_ip")

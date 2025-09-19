@@ -88,6 +88,9 @@ func NewWSListener(base net.Listener, path, trustedIps, realIpHeader string) net
 	ch := make(chan net.Conn, 16)
 	hl := &httpListener{acceptCh: ch, closeCh: make(chan struct{}), addr: base.Addr()}
 	upgrader := websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
+	if path == "" {
+		path = "/"
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 		select {
@@ -119,6 +122,9 @@ func NewWSSListener(base net.Listener, path string, cert tls.Certificate, truste
 	ch := make(chan net.Conn, 16)
 	hl := &httpListener{acceptCh: ch, closeCh: make(chan struct{}), addr: base.Addr()}
 	upgrader := websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
+	if path == "" {
+		path = "/"
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 		select {
