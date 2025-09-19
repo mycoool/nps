@@ -5,7 +5,6 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"os"
 	"os/exec"
@@ -26,27 +25,31 @@ import (
 	"github.com/djylb/nps/lib/mux"
 	"github.com/djylb/nps/lib/version"
 	"github.com/kardianos/service"
+
+	goflag "flag"
+	flag "github.com/spf13/pflag"
 )
 
-// 全局配置变量
+// Config
 var (
-	serverAddr     = flag.String("server", "", "Server addr (ip1:port1,ip2:port2)")
-	configPath     = flag.String("config", "", "Configuration file path (path1,path2)")
-	verifyKey      = flag.String("vkey", "", "Authentication key (eg: vkey1,vkey2)")
-	logType        = flag.String("log", "file", "Log output mode (stdout|file|both|off)")
-	connType       = flag.String("type", "tcp", "Connection type with the server (tcp|tls|kcp|quic|ws|wss) (eg: tcp,tls)")
+	ver            = flag.BoolP("version", "v", false, "Show current version")
+	serverAddr     = flag.StringP("server", "s", "", "Server addr (ip1:port1,ip2:port2)")
+	verifyKey      = flag.StringP("vkey", "k", "", "Authentication key (eg: vkey1,vkey2)")
+	connType       = flag.StringP("type", "t", "tcp", "Connection type with the server (tcp|tls|kcp|quic|ws|wss) (eg: tcp,tls)")
+	configPath     = flag.StringP("config", "c", "", "Configuration file path (path1,path2)")
 	proxyUrl       = flag.String("proxy", "", "Proxy socks5 URL (eg: socks5://user:pass@127.0.0.1:9007)")
-	logLevel       = flag.String("log_level", "trace", "Log level (trace|debug|info|warn|error|fatal|panic|off)")
-	registerTime   = flag.Int("time", 2, "Register time in hours")
-	p2pType        = flag.String("p2p_type", "quic", "P2P connection type (quic|kcp)")
+	localType      = flag.String("local_type", "p2p", "P2P target type")
 	localPort      = flag.Int("local_port", 2000, "P2P local port")
 	password       = flag.String("password", "", "P2P password flag")
 	target         = flag.String("target", "", "P2P target")
 	targetType     = flag.String("target_type", "all", "P2P target connection type (all|tcp|udp)")
+	p2pType        = flag.String("p2p_type", "quic", "P2P connection type (quic|kcp)")
 	localProxy     = flag.Bool("local_proxy", false, "Secret enable proxy local (true or false)")
-	localType      = flag.String("local_type", "p2p", "P2P target type")
 	fallbackSecret = flag.Bool("fallback_secret", true, "P2P fallback secret (true or false)")
 	disableP2P     = flag.Bool("disable_p2p", false, "Disable P2P connection (true or false)")
+	registerTime   = flag.Int("time", 2, "Register time in hours")
+	logType        = flag.String("log", "file", "Log output mode (stdout|file|both|off)")
+	logLevel       = flag.String("log_level", "trace", "Log level (trace|debug|info|warn|error|fatal|panic|off)")
 	logPath        = flag.String("log_path", "", "NPC log path (empty to use default, 'off' to disable)")
 	logMaxSize     = flag.Int("log_max_size", 5, "Maximum log file size in MB before rotation (0 to disable)")
 	logMaxDays     = flag.Int("log_max_days", 7, "Number of days to retain old log files (0 to disable)")
@@ -56,7 +59,6 @@ var (
 	debug          = flag.Bool("debug", true, "Enable debug mode")
 	pprofAddr      = flag.String("pprof", "", "PProf debug address (ip:port)")
 	stunAddr       = flag.String("stun_addr", "stun.miwifi.com:3478", "STUN server address")
-	ver            = flag.Bool("version", false, "Show current version")
 	protoVer       = flag.Int("proto_version", version.GetLatestIndex(), fmt.Sprintf("Protocol version (0-%d)", version.GetLatestIndex()))
 	skipVerify     = flag.Bool("skip_verify", false, "Skip verification of server certificate")
 	disconnectTime = flag.Int("disconnect_timeout", 60, "Disconnect timeout in seconds")
@@ -73,7 +75,23 @@ var (
 )
 
 func main() {
+	flag.CommandLine.SetNormalizeFunc(func(f *flag.FlagSet, name string) flag.NormalizedName {
+		name = strings.ReplaceAll(name, "-", "_")
+		name = strings.ReplaceAll(name, ".", "_")
+		return flag.NormalizedName(name)
+	})
+	normalizeLegacyLongFlags()
+	flag.CommandLine.SortFlags = false
+	flag.CommandLine.SetInterspersed(true)
+	flag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 	flag.Parse()
+
+	args := flag.Args()
+	var cmd string
+	if len(args) > 0 {
+		cmd = args[0]
+	}
+
 	// TOTP
 	if *genTOTP {
 		crypt.PrintTOTPSecret()
@@ -83,7 +101,7 @@ func main() {
 		crypt.PrintTOTPCode(*getTOTP)
 		return
 	}
-	// 显示版本并退出
+	// Version
 	if *ver {
 		version.PrintVersion(*protoVer)
 		return
@@ -97,19 +115,18 @@ func main() {
 		crypt.SkipVerify = true
 	}
 
-	// 配置时区
-	err := common.SetTimezone(*timezone)
-	if err != nil {
+	// Timezone
+	if err := common.SetTimezone(*timezone); err != nil {
 		logs.Warn("Set timezone error %v", err)
 	}
 
-	// 配置日志
+	// Log
 	configureLogging()
 
-	// 配置DNS
+	// DNS
 	common.SetCustomDNS(*dnsServer)
 
-	// 配置NTP
+	// NTP
 	common.SetNtpServer(*ntpServer)
 	common.SetNtpInterval(time.Duration(*ntpInterval) * time.Minute)
 
@@ -129,7 +146,7 @@ func main() {
 	default:
 	}
 
-	// 初始化服务
+	// Init
 	options := make(service.KeyValue)
 	svcConfig := &service.Config{
 		Name:        "Npc",
@@ -150,7 +167,8 @@ func main() {
 	// 配置服务启动参数
 	for _, v := range os.Args[1:] {
 		switch v {
-		case "install", "start", "stop", "uninstall", "restart":
+		case "install", "start", "stop", "uninstall", "restart",
+			"status", "register", "nat", "update":
 			continue
 		}
 		if !strings.Contains(v, "-service=") && !strings.Contains(v, "-debug=") {
@@ -175,116 +193,125 @@ func main() {
 	}
 
 	// 处理服务命令
-	if len(os.Args) >= 2 {
-		switch os.Args[1] {
-		case "status":
-			//	if len(os.Args) > 2 {
-			//		path := strings.Replace(os.Args[2], "-config=", "", -1)
-			//		client.GetTaskStatus(path)
-			//	}
-			_ = flag.CommandLine.Parse(os.Args[2:])
-			client.GetTaskStatus(*serverAddr, *verifyKey, *connType, *proxyUrl)
-		case "register":
-			_ = flag.CommandLine.Parse(os.Args[2:])
-			client.RegisterLocalIp(*serverAddr, *verifyKey, *connType, *proxyUrl, *registerTime)
-		case "update":
-			install.UpdateNpc()
+	switch cmd {
+	case "status":
+		client.GetTaskStatus(*serverAddr, *verifyKey, *connType, *proxyUrl)
+		return
+	case "register":
+		client.RegisterLocalIp(*serverAddr, *verifyKey, *connType, *proxyUrl, *registerTime)
+		return
+	case "update":
+		install.UpdateNpc()
+		return
+	case "nat":
+		c := stun.NewClient()
+		c.SetServerAddr(*stunAddr)
+		fmt.Println("STUN Server:", *stunAddr)
+		nat, host, err := c.Discover()
+		if err != nil {
+			logs.Error("Error: %v", err)
 			return
-		case "nat":
-			c := stun.NewClient()
-			_ = flag.CommandLine.Parse(os.Args[2:])
-			c.SetServerAddr(*stunAddr)
-			//logs.Info(*stunAddr)
-			fmt.Println("STUN Server:", *stunAddr)
-			nat, host, err := c.Discover()
-			if err != nil {
-				logs.Error("Error: %v", err)
-				return
-			}
-			fmt.Println("NAT Type:", nat)
-			if host != nil {
-				fmt.Println("External IP Family:", host.Family())
-				fmt.Println("External IP:", host.IP())
-				fmt.Println("External Port:", host.Port())
-			}
-			os.Exit(0)
-		case "start", "stop", "restart":
-			// support busyBox and sysV, for openWrt
-			if service.Platform() == "unix-systemv" {
-				logs.Info("unix-systemv service")
-				cmd := exec.Command("/etc/init.d/"+svcConfig.Name, os.Args[1])
-				err := cmd.Run()
-				if err != nil {
-					logs.Error("%v", err)
-				}
-				return
-			}
-			err := service.Control(s, os.Args[1])
-			if err != nil {
-				logs.Error("Valid actions: %q error: %v", service.ControlAction, err)
-			}
-			return
-		case "install":
-			_ = service.Control(s, "stop")
-			_ = service.Control(s, "uninstall")
-			install.InstallNpc()
-			err := service.Control(s, os.Args[1])
-			if err != nil {
-				logs.Error("Valid actions: %q error: %v", service.ControlAction, err)
-			}
-			if service.Platform() == "unix-systemv" {
-				logs.Info("unix-systemv service")
-				confPath := "/etc/init.d/" + svcConfig.Name
-				_ = os.Symlink(confPath, "/etc/rc.d/S90"+svcConfig.Name)
-				_ = os.Symlink(confPath, "/etc/rc.d/K02"+svcConfig.Name)
-			}
-			return
-		case "uninstall":
-			err := service.Control(s, os.Args[1])
-			if err != nil {
-				logs.Error("Valid actions: %q error: %v", service.ControlAction, err)
-			}
-			if service.Platform() == "unix-systemv" {
-				logs.Info("unix-systemv service")
-				_ = os.Remove("/etc/rc.d/S90" + svcConfig.Name)
-				_ = os.Remove("/etc/rc.d/K02" + svcConfig.Name)
+		}
+		fmt.Println("NAT Type:", nat)
+		if host != nil {
+			fmt.Println("External IP Family:", host.Family())
+			fmt.Println("External IP:", host.IP())
+			fmt.Println("External Port:", host.Port())
+		}
+		os.Exit(0)
+	case "start", "stop", "restart":
+		// support busyBox and sysV, for openWrt
+		if service.Platform() == "unix-systemv" {
+			logs.Info("unix-systemv service")
+			cmd := exec.Command("/etc/init.d/"+svcConfig.Name, os.Args[1])
+			if err := cmd.Run(); err != nil {
+				logs.Error("%v", err)
 			}
 			return
 		}
+		if err := service.Control(s, os.Args[1]); err != nil {
+			logs.Error("Valid actions: %q error: %v", service.ControlAction, err)
+		}
+		return
+	case "install":
+		_ = service.Control(s, "stop")
+		_ = service.Control(s, "uninstall")
+		install.InstallNpc()
+		if err := service.Control(s, os.Args[1]); err != nil {
+			logs.Error("Valid actions: %q error: %v", service.ControlAction, err)
+		}
+		if service.Platform() == "unix-systemv" {
+			logs.Info("unix-systemv service")
+			confPath := "/etc/init.d/" + svcConfig.Name
+			_ = os.Symlink(confPath, "/etc/rc.d/S90"+svcConfig.Name)
+			_ = os.Symlink(confPath, "/etc/rc.d/K02"+svcConfig.Name)
+		}
+		return
+	case "uninstall":
+		if err := service.Control(s, os.Args[1]); err != nil {
+			logs.Error("Valid actions: %q error: %v", service.ControlAction, err)
+		}
+		if service.Platform() == "unix-systemv" {
+			logs.Info("unix-systemv service")
+			_ = os.Remove("/etc/rc.d/S90" + svcConfig.Name)
+			_ = os.Remove("/etc/rc.d/K02" + svcConfig.Name)
+		}
+		return
 	}
 	_ = s.Run()
 }
 
-// 配置日志记录
+func normalizeLegacyLongFlags() {
+	norm := func(s string) string {
+		s = strings.ReplaceAll(s, "-", "_")
+		s = strings.ReplaceAll(s, ".", "_")
+		return s
+	}
+	defined := map[string]struct{}{}
+	flag.CommandLine.VisitAll(func(f *flag.Flag) {
+		defined[norm(f.Name)] = struct{}{}
+	})
+	if len(os.Args) <= 1 {
+		return
+	}
+	out := make([]string, 0, len(os.Args))
+	out = append(out, os.Args[0])
+	for _, a := range os.Args[1:] {
+		if strings.HasPrefix(a, "-") && !strings.HasPrefix(a, "--") && len(a) > 2 {
+			s := a[1:]
+			name, val := s, ""
+			if i := strings.IndexByte(s, '='); i >= 0 {
+				name, val = s[:i], s[i:]
+			}
+			if _, ok := defined[norm(name)]; ok {
+				a = "--" + name + val
+			}
+		}
+		out = append(out, a)
+	}
+	os.Args = out
+}
+
+// Log configure
 func configureLogging() {
-	// 关闭日志输出
 	if strings.EqualFold(*logType, "false") {
 		*logType = "off"
 	}
-
-	// 控制台日志
 	if *debug && *logType != "off" {
 		if *logType != "both" {
 			*logType = "stdout"
 		}
 		*logLevel = "trace"
 	}
-
-	// 处理日志路径默认值
 	if *logPath == "" || strings.EqualFold(*logPath, "on") || strings.EqualFold(*logPath, "true") {
-		*logPath = common.GetNpcLogPath() // 使用默认路径
+		*logPath = common.GetNpcLogPath()
 	}
-
-	// 相对路径使用配置文件路径
 	if !filepath.IsAbs(*logPath) {
 		*logPath = filepath.Join(common.GetRunPath(), *logPath)
 	}
-
-	// 针对 Windows 系统调整日志路径中的反斜杠
 	if common.IsWindows() {
 		*logPath = strings.Replace(*logPath, "\\", "\\\\", -1)
 	}
-
 	logs.Init(*logType, *logLevel, *logPath, *logMaxSize, *logMaxFiles, *logMaxDays, *logCompress, *logColor)
 }
 
@@ -392,9 +419,7 @@ func run(ctx context.Context, cancel context.CancelFunc) {
 
 		if len(connTypes) == 0 {
 			connTypes = append(connTypes, "tcp")
-			//logs.Info(connTypes)
 		}
-		//logs.Debug(connTypes)
 
 		if len(serverAddrs) == 0 || len(verifyKeys) == 0 || serverAddrs[0] == "" || verifyKeys[0] == "" {
 			logs.Error("serverAddr or verifyKey cannot be empty")
@@ -402,8 +427,6 @@ func run(ctx context.Context, cancel context.CancelFunc) {
 		}
 
 		maxLength := common.ExtendArrs(&serverAddrs, &verifyKeys, &connTypes)
-		//logs.Debug("max length: %d", maxLength)
-		//logs.Debug(serverAddrs, verifyKeys, connTypes)
 		for i := 0; i < maxLength; i++ {
 			serverAddr := serverAddrs[i]
 			verifyKey := verifyKeys[i]

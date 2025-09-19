@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"log"
 	"os"
 	"os/exec"
@@ -26,18 +25,37 @@ import (
 	"github.com/djylb/nps/server/tool"
 	"github.com/djylb/nps/web/routers"
 	"github.com/kardianos/service"
+
+	goflag "flag"
+	flag "github.com/spf13/pflag"
 )
 
 var (
 	logLevel string
+	confPath = flag.StringP("conf_path", "c", "", "Set Conf Path")
+	ver      = flag.BoolP("version", "v", false, "Show Current Version")
 	genTOTP  = flag.Bool("gen2fa", false, "Generate TOTP Secret")
 	getTOTP  = flag.String("get2fa", "", "Get TOTP Code")
-	ver      = flag.Bool("version", false, "Show Current Version")
-	confPath = flag.String("conf_path", "", "Set Conf Path")
 )
 
 func main() {
+	flag.CommandLine.SetNormalizeFunc(func(f *flag.FlagSet, name string) flag.NormalizedName {
+		name = strings.ReplaceAll(name, "-", "_")
+		name = strings.ReplaceAll(name, ".", "_")
+		return flag.NormalizedName(name)
+	})
+	normalizeLegacyLongFlags()
+	flag.CommandLine.SortFlags = false
+	flag.CommandLine.SetInterspersed(true)
+	flag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 	flag.Parse()
+
+	args := flag.Args()
+	var cmd string
+	if len(args) > 0 {
+		cmd = args[0]
+	}
+
 	// gen TOTP
 	if *genTOTP {
 		crypt.PrintTOTPSecret()
@@ -48,21 +66,15 @@ func main() {
 		crypt.PrintTOTPCode(*getTOTP)
 		return
 	}
-	// show ver
+	// show version
 	if *ver {
 		version.PrintVersion(version.GetLatestIndex())
 		return
 	}
 
-	// *confPath why get null value ?
-	for _, v := range os.Args[1:] {
-		switch v {
-		case "install", "start", "stop", "uninstall", "restart":
-			continue
-		}
-		if strings.Contains(v, "-conf_path=") {
-			common.ConfPath = strings.Replace(v, "-conf_path=", "", -1)
-		}
+	// set config path
+	if cp := strings.TrimSpace(*confPath); cp != "" {
+		common.ConfPath = cp
 	}
 
 	if err := beego.LoadAppConfig("ini", filepath.Join(common.GetRunPath(), "conf", "nps.conf")); err != nil {
@@ -142,8 +154,8 @@ func main() {
 		return
 	}
 
-	if len(os.Args) > 1 && os.Args[1] != "service" {
-		switch os.Args[1] {
+	if cmd != "" && cmd != "service" {
+		switch cmd {
 		case "reload":
 			daemon.InitDaemon("nps", common.GetRunPath(), common.GetTmpPath())
 			return
@@ -159,7 +171,7 @@ func main() {
 				logs.Error("%v", err)
 				return
 			}
-			err = service.Control(s, os.Args[1])
+			err = service.Control(s, cmd)
 			if err != nil {
 				logs.Error("Valid actions: %q error: %v", service.ControlAction, err)
 			}
@@ -173,20 +185,19 @@ func main() {
 		case "start", "restart", "stop":
 			if service.Platform() == "unix-systemv" {
 				logs.Info("unix-systemv service")
-				cmd := exec.Command("/etc/init.d/"+svcConfig.Name, os.Args[1])
-				err := cmd.Run()
-				if err != nil {
+				c := exec.Command("/etc/init.d/"+svcConfig.Name, cmd)
+				if err := c.Run(); err != nil {
 					logs.Error("%v", err)
 				}
 				return
 			}
-			err := service.Control(s, os.Args[1])
+			err := service.Control(s, cmd)
 			if err != nil {
 				logs.Error("Valid actions: %q error: %v", service.ControlAction, err)
 			}
 			return
 		case "uninstall":
-			err := service.Control(s, os.Args[1])
+			err := service.Control(s, cmd)
 			if err != nil {
 				logs.Error("Valid actions: %q error: %v", service.ControlAction, err)
 			}
@@ -205,6 +216,37 @@ func main() {
 		}
 	}
 	_ = s.Run()
+}
+
+func normalizeLegacyLongFlags() {
+	norm := func(s string) string {
+		s = strings.ReplaceAll(s, "-", "_")
+		s = strings.ReplaceAll(s, ".", "_")
+		return s
+	}
+	defined := map[string]struct{}{}
+	flag.CommandLine.VisitAll(func(f *flag.Flag) {
+		defined[norm(f.Name)] = struct{}{}
+	})
+	if len(os.Args) <= 1 {
+		return
+	}
+	out := make([]string, 0, len(os.Args))
+	out = append(out, os.Args[0])
+	for _, a := range os.Args[1:] {
+		if strings.HasPrefix(a, "-") && !strings.HasPrefix(a, "--") && len(a) > 2 {
+			s := a[1:]
+			name, val := s, ""
+			if i := strings.IndexByte(s, '='); i >= 0 {
+				name, val = s[:i], s[i:]
+			}
+			if _, ok := defined[norm(name)]; ok {
+				a = "--" + name + val
+			}
+		}
+		out = append(out, a)
+	}
+	os.Args = out
 }
 
 type nps struct {
