@@ -8,6 +8,8 @@
 - [支付宝](https://d-jy.net/api/pay/?type=alipay)
 - [爱发电](https://afdian.com/a/duanlab)
 - [GitHub](https://github.com/sponsors/djylb)
+- [Ko-fi](https://ko-fi.com/djylb)
+- [Buy Me a Coffee](https://buymeacoffee.com/djylb)
 
 ---
 
