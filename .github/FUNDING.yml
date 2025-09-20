@@ -1,6 +1,9 @@
 # These are supported funding model platforms
 
 github: [djylb]
+custom:
+  - "https://d-jy.net/docs/nps/#/donate"
+  - "https://afdian.com/a/duanlab"
 patreon: # Replace with a single Patreon username
 open_collective: # Replace with a single Open Collective username
 ko_fi: djylb
@@ -12,6 +15,3 @@ lfx_crowdfunding: # Replace with a single LFX Crowdfunding project-name e.g., cl
 polar: # Replace with a single Polar username
 buy_me_a_coffee: djylb
 thanks_dev: # Replace with a single thanks.dev username
-custom:
-  - "https://d-jy.net/docs/nps/#/donate"
-  - "https://afdian.com/a/duanlab"
