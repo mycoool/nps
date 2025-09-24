@@ -135,7 +135,7 @@ func (s *UdpModeServer) clientWorker(addr *net.UDPAddr, ent *entry) {
 		logs.Trace("SendLinkInfo error: %v", err)
 		return
 	}
-	target := conn.GetConn(clientConn, s.Task.Client.Cnf.Crypt, s.Task.Client.Cnf.Compress, nil, true, isLocal)
+	target := conn.GetConn(clientConn, s.Task.Client.Cnf.Crypt, s.Task.Client.Cnf.Compress, s.Task.Client.Rate, true, isLocal)
 	flowConn := conn.NewFlowConn(target, s.Task.Flow, s.Task.Client.Flow)
 	if isLocal && s.Bridge.IsServer() {
 		ent.conn = flowConn

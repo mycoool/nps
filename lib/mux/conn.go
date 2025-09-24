@@ -241,9 +241,12 @@ func (Self *receiveWindow) calcSize() {
 				// less than 20% fill, gain will trigger
 				n = uint32(float64(n) * 1.5625 * ra * ra)
 			}
-			if n < size/2 {
-				n = size / 2
-				// half reduce
+			minN := uint32((uint64(size) * 7) / 8)
+			if wait && rem == 0 {
+				minN = size / 2
+			}
+			if n < minN {
+				n = minN
 			}
 			// set the minimal size
 			if n > 2*size {
@@ -440,10 +443,11 @@ func (Self *receiveWindow) release() {
 
 type sendWindow struct {
 	window
-	buf       []byte
-	setSizeCh chan struct{}
-	timeout   time.Time
-	priority  bool
+	buf         []byte
+	setSizeCh   chan struct{}
+	setSizeOnce sync.Once
+	timeout     time.Time
+	priority    bool
 	// send window receive the receiving window max size and read size
 	// done size store the size send window has sent, send and read will be totally equal
 	// so send minus read, send window can get the current window size remaining
@@ -451,7 +455,7 @@ type sendWindow struct {
 
 func (Self *sendWindow) New(mux *Mux) {
 	Self.priority = false
-	Self.setSizeCh = make(chan struct{})
+	Self.setSizeCh = make(chan struct{}, 1)
 	Self.maxSizeDone = Self.pack(maximumSegmentSize*30, 0, false)
 	Self.mux = mux
 	Self.window.New()
@@ -471,15 +475,21 @@ func (Self *sendWindow) remainingSize(maxSize, send uint32) uint32 {
 	return 0
 }
 
+func (Self *sendWindow) safeCloseSetSizeCh() {
+	Self.setSizeOnce.Do(func() {
+		close(Self.setSizeCh)
+	})
+}
+
 func (Self *sendWindow) SetSize(currentMaxSizeDone uint64) (closed bool) {
 	// set the window size from receive window
 	defer func() {
-		if recover() != nil {
+		if r := recover(); r != nil {
 			closed = true
 		}
 	}()
 	if Self.closeOp {
-		close(Self.setSizeCh)
+		Self.safeCloseSetSizeCh()
 		return true
 	}
 	var maxsize, send uint32
@@ -495,18 +505,17 @@ func (Self *sendWindow) SetSize(currentMaxSizeDone uint64) (closed bool) {
 		if read == 0 && currentMaxSize == maxsize {
 			return
 		}
-		send -= read
-		remain := Self.remainingSize(currentMaxSize, send)
-		if remain == 0 && wait {
-			// just keep the wait status
-			newWait = true
-		}
+		outstanding := (send - read) & mask31
+		remain := Self.remainingSize(currentMaxSize, outstanding)
+		nextWait := remain == 0 && wait
+
 		// remain > 0, change wait to false. or remain == 0, wait is false, just keep it
-		if atomic.CompareAndSwapUint64(&Self.maxSizeDone, ptrs, Self.pack(currentMaxSize, send, newWait)) {
-			//logs.Printf("currentMaxSize:%d read:%d send:%d", currentMaxSize, read, send)
+		if atomic.CompareAndSwapUint64(&Self.maxSizeDone, ptrs, Self.pack(currentMaxSize, outstanding, nextWait)) {
+			//logs.Printf("currentMaxSize:%d read:%d send(outstanding):%d", currentMaxSize, read, outstanding)
+			newWait = nextWait
 			break
 		}
-		// an anther goroutine change wait status or window size
+		// another goroutine change wait status or window size
 	}
 	if wait && !newWait {
 		// send window into the wait status, need notice the channel
@@ -517,12 +526,13 @@ func (Self *sendWindow) SetSize(currentMaxSizeDone uint64) (closed bool) {
 }
 
 func (Self *sendWindow) allow() {
+	if Self.closeOp {
+		return
+	}
+	defer func() { _ = recover() }()
 	select {
 	case Self.setSizeCh <- struct{}{}:
-		return
-	case <-Self.closeOpCh:
-		close(Self.setSizeCh)
-		return
+	default:
 	}
 }
 
