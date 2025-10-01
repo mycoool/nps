@@ -24,9 +24,9 @@ const (
 	bindMethod      = 2
 	associateMethod = 3
 	// The maximum packet size of any udp Associate packet, based on ethernet's max size,
-	// minus the IP and UDP headers. IPv4 has a 20 byte header, UDP adds an
-	// additional 4 bytes.  This is a total overhead of 24 bytes.  Ethernet's
-	// max packet size is 1500 bytes,  1500 - 24 = 1476.
+	// minus the IP and UDP headers. IPv4 has a 20 byte header, UDP adds another 4 bytes.
+	// This is a total overhead of 24 bytes. Ethernet's max packet size is 1500 bytes,
+	// 1500 - 24 = 1476.
 	maxUDPPacketSize = 1476
 )
 
@@ -48,16 +48,6 @@ const (
 	authSuccess     = uint8(0)
 	authFailure     = uint8(1)
 )
-
-func normalizeIP(ip net.IP) net.IP {
-	if ip == nil {
-		return nil
-	}
-	if v4 := ip.To4(); v4 != nil {
-		return v4
-	}
-	return ip.To16()
-}
 
 // req
 func (s *TunnelModeServer) handleSocks5Request(c net.Conn) {
@@ -127,8 +117,8 @@ func (s *TunnelModeServer) sendReply(c net.Conn, rep uint8) {
 	_, _ = c.Write(reply)
 }
 
-// do conn
-func (s *TunnelModeServer) doConnect(c net.Conn, command uint8) {
+// conn - CONNECT
+func (s *TunnelModeServer) handleConnect(c net.Conn) {
 	addrType := make([]byte, 1)
 	if _, err := io.ReadFull(c, addrType); err != nil {
 		s.sendReply(c, addrTypeNotSupported)
@@ -174,19 +164,10 @@ func (s *TunnelModeServer) doConnect(c net.Conn, command uint8) {
 	}
 
 	addr := net.JoinHostPort(host, strconv.Itoa(int(port)))
-	ltype := common.CONN_TCP
-	if command == associateMethod {
-		ltype = common.CONN_UDP
-	}
 
-	_ = s.DealClient(conn.NewConn(c), s.Task.Client, addr, nil, ltype, func() {
+	_ = s.DealClient(conn.NewConn(c), s.Task.Client, addr, nil, common.CONN_TCP, func() {
 		s.sendReply(c, succeeded)
 	}, []*file.Flow{s.Task.Flow, s.Task.Client.Flow}, 0, s.Task.Target.LocalProxy, s.Task)
-}
-
-// conn
-func (s *TunnelModeServer) handleConnect(c net.Conn) {
-	s.doConnect(c, connectMethod)
 }
 
 // passive mode
@@ -196,24 +177,24 @@ func (s *TunnelModeServer) handleBind(c net.Conn) {
 }
 
 func (s *TunnelModeServer) sendUdpReply(writeConn net.Conn, replyUDP *net.UDPConn, rep uint8, clientIP net.IP) {
+	wantV6 := clientIP != nil && clientIP.To4() == nil
+
 	var ipToUse net.IP
-	if la, ok := replyUDP.LocalAddr().(*net.UDPAddr); ok && la != nil && la.IP != nil {
-		isZero := la.IP.Equal(net.IPv4zero) || la.IP.Equal(net.IPv6zero)
-		if !isZero {
+
+	if la, ok := replyUDP.LocalAddr().(*net.UDPAddr); ok && la != nil && la.IP != nil && !common.IsZeroIP(la.IP) {
+		if (la.IP.To4() == nil) == wantV6 {
 			ipToUse = la.IP
 		}
 	}
 
 	if ipToUse == nil {
-		if candStr := common.GetServerIpByClientIp(clientIP); candStr != "" {
-			if cand := net.ParseIP(candStr); cand != nil {
-				ipToUse = cand
-			}
+		if eip := common.PickEgressIPFor(clientIP); eip != nil && (eip.To4() == nil) == wantV6 {
+			ipToUse = eip
 		}
 	}
 
 	if ipToUse == nil {
-		if clientIP != nil && clientIP.To4() == nil {
+		if wantV6 {
 			ipToUse = net.IPv6loopback
 		} else {
 			ipToUse = net.IPv4(127, 0, 0, 1)
@@ -296,22 +277,22 @@ func (s *TunnelModeServer) handleUDP(c net.Conn) {
 	logs.Trace("ASSOCIATE %s:%d", host, port)
 
 	// get listen addr
-	replyAddr, err := net.ResolveUDPAddr("udp", s.Task.ServerIp+":0")
-	if err != nil {
-		s.sendReply(c, addrTypeNotSupported)
-		logs.Error("resolve local udp addr error: %v", err)
-		return
+	var clientIP net.IP
+	if ta, ok := c.RemoteAddr().(*net.TCPAddr); ok && ta != nil {
+		clientIP = ta.IP
 	}
-	reply, err := net.ListenUDP("udp", replyAddr)
+	network, localAddr := common.BuildUdpBindAddr(s.Task.ServerIp, clientIP)
+
+	reply, err := net.ListenUDP(network, localAddr)
 	if err != nil {
 		s.sendReply(c, addrTypeNotSupported)
-		logs.Error("listen local reply udp port error: %v", err)
+		logs.Error("listen local reply udp port error: %v (network=%s, localAddr=%v)", err, network, localAddr)
 		return
 	}
 	defer reply.Close()
 
 	// reply the local addr
-	clientIP := c.RemoteAddr().(*net.TCPAddr).IP
+	//clientIP := c.RemoteAddr().(*net.TCPAddr).IP
 	s.sendUdpReply(c, reply, succeeded, clientIP)
 
 	// new a tunnel to client
@@ -336,8 +317,8 @@ func (s *TunnelModeServer) handleUDP(c net.Conn) {
 
 	// local UDP -> tunnel
 	go func() {
-		b := common.BufPoolUdp.Get().([]byte)
-		defer common.BufPoolUdp.Put(b)
+		b := common.BufPoolMax.Get().([]byte)
+		defer common.PutBufPoolMax(b)
 
 		for {
 			n, lAddr, err := reply.ReadFromUDP(b)
@@ -348,13 +329,18 @@ func (s *TunnelModeServer) handleUDP(c net.Conn) {
 				return
 			}
 			if clientIPSeen == nil {
-				clientIPSeen = normalizeIP(lAddr.IP)
+				clientIPSeen = common.NormalizeIP(lAddr.IP)
 			}
-			if !normalizeIP(lAddr.IP).Equal(clientIPSeen) {
+			if !common.NormalizeIP(lAddr.IP).Equal(clientIPSeen) {
 				logs.Debug("ignore udp from unexpected ip: %v", lAddr.IP)
 				continue
 			}
 			clientAddr.Store(lAddr)
+
+			if n >= 3 && b[2] != 0 {
+				logs.Warn("socks5 udp frag not supported, drop (frag=%d)", b[2])
+				continue
+			}
 
 			if n > conn.MaxFramePayload {
 				logs.Debug("udp datagram too large: %d > %d (drop)", n, conn.MaxFramePayload)
@@ -393,8 +379,8 @@ func (s *TunnelModeServer) handleUDP(c net.Conn) {
 		}
 	}()
 
-	b := common.BufPoolUdp.Get().([]byte)
-	defer common.BufPoolUdp.Put(b)
+	b := common.BufPoolMax.Get().([]byte)
+	defer common.PutBufPoolMax(b)
 	for {
 		if _, err := c.Read(b); err != nil {
 			_ = flowConn.Close()

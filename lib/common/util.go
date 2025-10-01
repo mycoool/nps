@@ -806,6 +806,39 @@ func GetExtFromPath(path string) string {
 	return string(re.Find([]byte(s[0])))
 }
 
+func NormalizeIP(ip net.IP) net.IP {
+	if ip == nil {
+		return nil
+	}
+	if v4 := ip.To4(); v4 != nil {
+		return v4
+	}
+	return ip.To16()
+}
+
+func IsZeroIP(ip net.IP) bool {
+	if ip == nil {
+		return true
+	}
+	return ip.Equal(net.IPv4zero) || ip.Equal(net.IPv6zero)
+}
+
+func BuildUdpBindAddr(serverIP string, clientIP net.IP) (network string, addr *net.UDPAddr) {
+	if ip := net.ParseIP(serverIP); ip != nil && !IsZeroIP(ip) {
+		if ip.To4() != nil {
+			return "udp4", &net.UDPAddr{IP: ip, Port: 0}
+		}
+		return "udp6", &net.UDPAddr{IP: ip, Port: 0}
+	}
+	if clientIP != nil {
+		if clientIP.To4() != nil {
+			return "udp4", &net.UDPAddr{IP: net.IPv4zero, Port: 0}
+		}
+		return "udp6", &net.UDPAddr{IP: net.IPv6unspecified, Port: 0}
+	}
+	return "udp", &net.UDPAddr{IP: nil, Port: 0}
+}
+
 func IsSameIPType(addr1, addr2 string) bool {
 	ip1 := strings.Contains(addr1, "[")
 	ip2 := strings.Contains(addr2, "[")
@@ -877,6 +910,27 @@ func GetExternalIp() string {
 		return externalIp
 	}
 	return FetchExternalIp()
+}
+
+func PickEgressIPFor(dstIP net.IP) net.IP {
+	if dstIP == nil {
+		return nil
+	}
+	network := "udp4"
+	if dstIP.To4() == nil {
+		network = "udp6"
+	}
+	raddr := (&net.UDPAddr{IP: dstIP, Port: 9}).String()
+	d := net.Dialer{Timeout: 300 * time.Millisecond}
+	conn, err := d.Dial(network, raddr)
+	if err != nil {
+		return nil
+	}
+	defer conn.Close()
+	if la, ok := conn.LocalAddr().(*net.UDPAddr); ok && la != nil && !IsZeroIP(la.IP) {
+		return la.IP
+	}
+	return nil
 }
 
 func GetIntranetIp() string {

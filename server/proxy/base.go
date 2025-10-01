@@ -121,8 +121,8 @@ func (s *BaseServer) DealClient(c *conn.Conn, client *file.Client, addr string,
 	if f != nil {
 		f()
 	}
-
-	conn.CopyWaitGroup(target, c.Conn, link.Crypt, link.Compress, client.Rate, flows, true, proxyProtocol, rb, task, isLocal, false)
+	isFramed := tp == common.CONN_UDP
+	conn.CopyWaitGroup(target, c.Conn, link.Crypt, link.Compress, client.Rate, flows, true, proxyProtocol, rb, task, isLocal, isFramed)
 	return nil
 }
 
