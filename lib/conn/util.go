@@ -218,11 +218,11 @@ func CopyWaitGroup(conn1, conn2 net.Conn, crypt bool, snappy bool, rate *rate.Ra
 	if err != nil {
 		logs.Error("CopyConnsPool.Invoke failed: %v", err)
 		wg.Done()
-		_ = connHandle.Close()
+		_ = conn1.Close()
 		_ = conn2.Close()
 	}
 	wg.Wait()
-	_ = connHandle.Close()
+	_ = conn1.Close()
 	_ = conn2.Close()
 	return
 }

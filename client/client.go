@@ -111,7 +111,7 @@ func (s *TRPClient) Start(ctx context.Context) {
 				s.Close()
 				return
 			}
-			sc := conn.NewQuicStreamConn(stream, t)
+			sc := conn.NewQuicAutoCloseConn(stream, t)
 			c := conn.NewConn(sc)
 			err = SendType(c, common.WORK_MAIN, s.uuid)
 			if err != nil {
@@ -274,12 +274,14 @@ func (s *TRPClient) newUdpConn(localAddr, rAddr string, md5Password string) {
 			}
 			if !timer.Stop() {
 				logs.Warn("QUIC pre-connection timer already fired")
+				_ = sess.CloseWithError(0, "timer already fired")
 				return
 			}
 			for {
 				stream, err := sess.AcceptStream(ctx)
 				if err != nil {
 					logs.Trace("QUIC accept stream error: %v", err)
+					_ = sess.CloseWithError(0, "accept stream error")
 					return
 				}
 				c := conn.NewQuicStreamConn(stream, sess)
