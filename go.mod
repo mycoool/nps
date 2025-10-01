@@ -6,7 +6,7 @@ require (
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
 	github.com/beego/beego v1.12.14
 	github.com/beevik/ntp v1.4.3
-	github.com/brianvoe/gofakeit/v7 v7.7.0
+	github.com/brianvoe/gofakeit/v7 v7.7.3
 	github.com/c4milo/unpackit v1.0.0
 	github.com/caddyserver/certmagic v0.25.0
 	github.com/ccding/go-stun v0.1.5
@@ -16,9 +16,9 @@ require (
 	github.com/kardianos/service v1.2.4
 	github.com/miekg/dns v1.1.68
 	github.com/panjf2000/ants/v2 v2.11.3
-	github.com/quic-go/quic-go v0.54.0
+	github.com/quic-go/quic-go v0.54.1
 	github.com/rs/zerolog v1.34.0
-	github.com/shirou/gopsutil/v4 v4.25.8
+	github.com/shirou/gopsutil/v4 v4.25.9
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
 	github.com/spf13/pflag v1.0.10
 	github.com/xtaci/kcp-go/v5 v5.6.24
@@ -34,7 +34,7 @@ require (
 	github.com/caddyserver/zerossl v0.1.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/dsnet/compress v0.0.1 // indirect
-	github.com/ebitengine/purego v0.8.4 // indirect
+	github.com/ebitengine/purego v0.9.0 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/hashicorp/golang-lru v1.0.2 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
@@ -45,7 +45,7 @@ require (
 	github.com/lufia/plan9stats v0.0.0-20250827001030-24949be3fa54 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/mholt/acmez/v3 v3.1.3 // indirect
+	github.com/mholt/acmez/v3 v3.1.4 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
