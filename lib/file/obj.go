@@ -205,6 +205,22 @@ type Tunnel struct {
 	sync.RWMutex
 }
 
+func NewTunnelByHost(host *Host, port int) *Tunnel {
+	return &Tunnel{
+		ServerIp:     "0.0.0.0",
+		Port:         port,
+		Mode:         "tcp",
+		Status:       !host.IsClose,
+		RunStatus:    !host.IsClose,
+		Client:       host.Client,
+		Flow:         host.Flow,
+		NoStore:      true,
+		Target:       host.Target,
+		UserAuth:     host.UserAuth,
+		MultiAccount: host.MultiAccount,
+	}
+}
+
 func (s *Tunnel) Update(t *Tunnel) {
 	s.ServerIp = t.ServerIp
 	s.Mode = t.Mode

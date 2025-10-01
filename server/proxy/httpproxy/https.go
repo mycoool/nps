@@ -211,11 +211,7 @@ func (s *HttpsServer) handleHttpsProxy(host *file.Host, c net.Conn, rb []byte, s
 		return
 	}
 	logs.Info("New HTTPS connection, clientId %d, host %s, remote address %v", host.Client.Id, sni, c.RemoteAddr())
-	task := &file.Tunnel{
-		Port:   s.HttpsPort,
-		Flow:   host.Flow,
-		Target: host.Target,
-	}
+	task := file.NewTunnelByHost(host, s.HttpsPort)
 	_ = s.DealClient(conn.NewConn(c), host.Client, targetAddr, rb, common.CONN_TCP, nil, []*file.Flow{host.Flow, host.Client.Flow}, host.Target.ProxyProtocol, host.Target.LocalProxy, task)
 }
 
@@ -236,11 +232,7 @@ func (s *HttpsServer) handleTlsProxy(host *file.Host, tlsConn net.Conn, sni stri
 		return
 	}
 	logs.Info("New TLS offload connection, clientId %d, host %s, remote %v -> %s", host.Client.Id, sni, tlsConn.RemoteAddr(), targetAddr)
-	task := &file.Tunnel{
-		Port:   s.HttpsPort,
-		Flow:   host.Flow,
-		Target: host.Target,
-	}
+	task := file.NewTunnelByHost(host, s.HttpsPort)
 	_ = s.DealClient(conn.NewConn(tlsConn), host.Client, targetAddr, nil, common.CONN_TCP, nil, []*file.Flow{host.Flow, host.Client.Flow}, host.Target.ProxyProtocol, host.Target.LocalProxy, task)
 }
 
