@@ -121,6 +121,8 @@ func stripCommentLines(s string) string {
 
 func dealCommon(s string) *CommonConfig {
 	c := new(CommonConfig)
+	c.Tp = "tcp"
+	c.AutoReconnection = true
 	c.Client = file.NewClient("", true, true)
 	c.Client.Cnf = new(file.Config)
 	for _, v := range splitStr(s) {
