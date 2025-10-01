@@ -300,16 +300,6 @@
                         <li class="list-group-item ">
                             <div class="row">
                                 <div class="col-sm-6">
-                                    <strong langtag="word-udpconnections_established"></strong>
-                                </div>
-                                <div class="col-sm-6 text-right">
-                                    <strong id="overview_udp"></strong>
-                                </div>
-                            </div>
-                        </li>
-                        <li class="list-group-item ">
-                            <div class="row">
-                                <div class="col-sm-6">
                                     <strong langtag="word-outbandwidth"></strong>
                                 </div>
                                 <div class="col-sm-6 text-right">
@@ -484,7 +474,6 @@
     $("#overview_memory_bar").width("{{.data.virtual_mem}}%")
     $.each( JSON.parse({{.data.load}}), function(i, value) { $("#overview_load").append('&emsp;' + value) });
     $("#overview_tcp").text("{{.data.tcp}}")
-    $("#overview_udp").text("{{.data.udp}}")
     $("#overview_send").text(changeunit({{.data.io_send}}) + "/s")
     $("#overview_recv").text(changeunit({{.data.io_recv}}) + "/s")
 
