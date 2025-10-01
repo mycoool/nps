@@ -211,10 +211,9 @@ func (s *TunnelModeServer) sendUdpReply(writeConn net.Conn, replyUDP *net.UDPCon
 		addrBytes = ipToUse.To16()
 	}
 
-	_, p, _ := net.SplitHostPort(replyUDP.LocalAddr().String())
-	nPort, _ := strconv.Atoi(p)
+	la := replyUDP.LocalAddr().(*net.UDPAddr)
 	portBytes := make([]byte, 2)
-	binary.BigEndian.PutUint16(portBytes, uint16(nPort))
+	binary.BigEndian.PutUint16(portBytes, uint16(la.Port))
 
 	// VER, REP, RSV, ATYP, BND.ADDR, BND.PORT
 	reply := []byte{5, rep, 0, atype}
