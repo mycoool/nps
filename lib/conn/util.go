@@ -83,26 +83,31 @@ func HandleUdp5(ctx context.Context, serverConn net.Conn, timeout time.Duration)
 	defer serverConn.Close()
 	timeoutConn := NewTimeoutConn(serverConn, timeout)
 	defer timeoutConn.Close()
+
+	framed := WrapFramed(timeoutConn)
+
 	local, err := net.ListenUDP("udp", nil)
 	if err != nil {
 		logs.Error("bind local udp port error %v", err)
 		return
 	}
 	defer local.Close()
+
 	relayCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	go func() {
 		defer cancel()
-		b := common.BufPoolUdp.Get().([]byte)
-		defer common.BufPoolUdp.Put(b)
+		udpBuf := common.BufPoolUdp.Get().([]byte)
+		defer common.BufPoolUdp.Put(udpBuf)
+
 		for {
 			select {
 			case <-relayCtx.Done():
 				return
 			default:
 			}
-			n, rAddr, err := local.ReadFrom(b)
+			n, rAddr, err := local.ReadFrom(udpBuf)
 			if err != nil {
 				if errors.Is(err, net.ErrClosed) {
 					logs.Info("local UDP closed, exiting goroutine")
@@ -115,34 +120,34 @@ func HandleUdp5(ctx context.Context, serverConn net.Conn, timeout time.Duration)
 				logs.Error("read data from remote server error %v", err)
 				return
 			}
-			buf := bytes.Buffer{}
-			dgram := common.NewUDPDatagram(common.NewUDPHeader(0, 0, common.ToSocksAddr(rAddr)), b[:n])
-			_ = dgram.Write(&buf)
-			b, err := GetLenBytes(buf.Bytes())
-			if err != nil {
-				logs.Warn("get len bytes error %v", err)
-				continue
-			}
-			if _, err := timeoutConn.Write(b); err != nil {
+
+			hdr := common.NewUDPHeader(0, 0, common.ToSocksAddr(rAddr))
+			dgram := common.NewUDPDatagram(hdr, udpBuf[:n])
+
+			if err := dgram.Write(framed); err != nil {
 				logs.Error("write data to remote error %v", err)
 				return
 			}
 		}
 	}()
-	b := common.BufPoolUdp.Get().([]byte)
-	defer common.BufPoolUdp.Put(b)
+
+	frameBuf := common.BufPoolMax.Get().([]byte)
+	defer common.PutBufPoolMax(frameBuf)
+
 	for {
 		select {
 		case <-relayCtx.Done():
 			return
 		default:
 		}
-		n, err := timeoutConn.Read(b)
+
+		n, err := framed.Read(frameBuf)
 		if err != nil {
-			logs.Error("read udp data from server error %v", err)
+			logs.Error("read udp frame from tunnel error %v", err)
 			return
 		}
-		udpData, err := common.ReadUDPDatagram(bytes.NewReader(b[:n]))
+
+		udpData, err := common.ReadUDPDatagram(bytes.NewReader(frameBuf[:n]))
 		if err != nil {
 			logs.Error("unpack data error %v", err)
 			return
@@ -152,8 +157,7 @@ func HandleUdp5(ctx context.Context, serverConn net.Conn, timeout time.Duration)
 			logs.Error("build remote addr err %v", err)
 			continue // drop silently
 		}
-		_, err = local.WriteTo(udpData.Data, rAddr)
-		if err != nil {
+		if _, err := local.WriteTo(udpData.Data, rAddr); err != nil {
 			logs.Error("write data to remote %v error %v", rAddr, err)
 			return
 		}
