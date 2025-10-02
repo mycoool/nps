@@ -747,7 +747,7 @@
 		<en-US>TCP Connections (Establish)</en-US>
 	</lang>
 	<lang id="word-tcpconnections">
-		<zh-CN>当前TCP连接数</zh-CN>
+		<zh-CN>当前连接数</zh-CN>
 		<en-US>TCP Connections</en-US>
 	</lang>
 	<lang id="word-totalclients">
