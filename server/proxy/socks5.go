@@ -49,16 +49,12 @@ const (
 	authFailure     = uint8(1)
 )
 
-// req
+// Handle the SOCKS5 request after method selection.
+// Expected header:
+// +----+-----+-------+------+----------+----------+
+// |VER | CMD |  RSV  | ATYP | DST.ADDR | DST.PORT |
+// +----+-----+-------+------+----------+----------+
 func (s *TunnelModeServer) handleSocks5Request(c net.Conn) {
-	/*
-		The SOCKS request is formed as follows:
-		+----+-----+-------+------+----------+----------+
-		|VER | CMD |  RSV  | ATYP | DST.ADDR | DST.PORT |
-		+----+-----+-------+------+----------+----------+
-		| 1  |  1  | X'00' |  1   | Variable |    2     |
-		+----+-----+-------+------+----------+----------+
-	*/
 	header := make([]byte, 3)
 	if _, err := io.ReadFull(c, header); err != nil {
 		logs.Warn("illegal request (head) %v", err)
@@ -86,7 +82,7 @@ func (s *TunnelModeServer) handleSocks5Request(c net.Conn) {
 	}
 }
 
-// reply
+// Send a standard SOCKS5 reply using c.LocalAddr as BND.ADDR/BND.PORT.
 func (s *TunnelModeServer) sendReply(c net.Conn, rep uint8) {
 	localAddr := c.LocalAddr().String()
 	localHost, localPort, _ := net.SplitHostPort(localAddr)
@@ -113,11 +109,10 @@ func (s *TunnelModeServer) sendReply(c net.Conn, rep uint8) {
 	reply := []byte{5, rep, 0, atype}
 	reply = append(reply, addrBytes...)
 	reply = append(reply, portBytes...)
-
 	_, _ = c.Write(reply)
 }
 
-// conn - CONNECT
+// CONNECT command handler: parse target and bridge TCP through DealClient.
 func (s *TunnelModeServer) handleConnect(c net.Conn) {
 	addrType := make([]byte, 1)
 	if _, err := io.ReadFull(c, addrType); err != nil {
@@ -170,29 +165,40 @@ func (s *TunnelModeServer) handleConnect(c net.Conn) {
 	}, []*file.Flow{s.Task.Flow, s.Task.Client.Flow}, 0, s.Task.Target.LocalProxy, s.Task)
 }
 
-// passive mode
+// BIND is not supported.
 func (s *TunnelModeServer) handleBind(c net.Conn) {
 	s.sendReply(c, commandNotSupported)
 	_ = c.Close()
 }
 
+// Compose UDP associate reply. Prefer the actual UDP bound IP, then TCP local IP,
 func (s *TunnelModeServer) sendUdpReply(writeConn net.Conn, replyUDP *net.UDPConn, rep uint8, clientIP net.IP) {
 	wantV6 := clientIP != nil && clientIP.To4() == nil
 
 	var ipToUse net.IP
+	var tcpLocalIP net.IP
+	var udpLocalIP net.IP
 
-	if la, ok := replyUDP.LocalAddr().(*net.UDPAddr); ok && la != nil && la.IP != nil && !common.IsZeroIP(la.IP) {
-		if (la.IP.To4() == nil) == wantV6 {
-			ipToUse = la.IP
-		}
+	if ta, ok := writeConn.LocalAddr().(*net.TCPAddr); ok && ta != nil && ta.IP != nil {
+		tcpLocalIP = ta.IP
+	}
+	if ua, ok := replyUDP.LocalAddr().(*net.UDPAddr); ok && ua != nil && ua.IP != nil {
+		udpLocalIP = ua.IP
 	}
 
-	if ipToUse == nil {
-		if eip := common.PickEgressIPFor(clientIP); eip != nil && (eip.To4() == nil) == wantV6 {
-			ipToUse = eip
+	// 1) Prefer UDP bound IP if it's specific and matches family.
+	if udpLocalIP != nil && !udpLocalIP.IsUnspecified() && !common.IsZeroIP(udpLocalIP) {
+		if (udpLocalIP.To4() == nil) == wantV6 {
+			ipToUse = udpLocalIP
 		}
 	}
-
+	// 2) Fallback to TCP local IP if family matches.
+	if ipToUse == nil && tcpLocalIP != nil && !tcpLocalIP.IsUnspecified() && !common.IsZeroIP(tcpLocalIP) {
+		if (tcpLocalIP.To4() == nil) == wantV6 {
+			ipToUse = tcpLocalIP
+		}
+	}
+	// 3) Final fallback to loopback
 	if ipToUse == nil {
 		if wantV6 {
 			ipToUse = net.IPv6loopback
@@ -214,6 +220,9 @@ func (s *TunnelModeServer) sendUdpReply(writeConn net.Conn, replyUDP *net.UDPCon
 	la := replyUDP.LocalAddr().(*net.UDPAddr)
 	portBytes := make([]byte, 2)
 	binary.BigEndian.PutUint16(portBytes, uint16(la.Port))
+
+	logs.Debug("send udp reply: chosen=%v atype=%d bndPort=%d wantV6=%v tcpLocal=%v udpLocal=%v clientIP=%v",
+		ipToUse, atype, la.Port, wantV6, writeConn.LocalAddr(), replyUDP.LocalAddr(), clientIP)
 
 	// VER, REP, RSV, ATYP, BND.ADDR, BND.PORT
 	reply := []byte{5, rep, 0, atype}
@@ -267,7 +276,6 @@ func (s *TunnelModeServer) handleUDP(c net.Conn) {
 		s.sendReply(c, addrTypeNotSupported)
 		return
 	}
-	// read port
 	var port uint16
 	if err := binary.Read(c, binary.BigEndian, &port); err != nil {
 		s.sendReply(c, addrTypeNotSupported)
@@ -275,13 +283,13 @@ func (s *TunnelModeServer) handleUDP(c net.Conn) {
 	}
 	logs.Trace("ASSOCIATE %s:%d", host, port)
 
-	// get listen addr
+	// Bind a UDP socket. Try to match client's address family where possible.
 	var clientIP net.IP
 	if ta, ok := c.RemoteAddr().(*net.TCPAddr); ok && ta != nil {
 		clientIP = ta.IP
 	}
 	network, localAddr := common.BuildUdpBindAddr(s.Task.ServerIp, clientIP)
-
+	logs.Trace("listen local reply udp port (network=%s, localAddr=%v)", network, localAddr)
 	reply, err := net.ListenUDP(network, localAddr)
 	if err != nil {
 		s.sendReply(c, addrTypeNotSupported)
@@ -290,13 +298,12 @@ func (s *TunnelModeServer) handleUDP(c net.Conn) {
 	}
 	defer reply.Close()
 
-	// reply the local addr
-	//clientIP := c.RemoteAddr().(*net.TCPAddr).IP
+	// Reply BND.ADDR/PORT to client.
 	s.sendUdpReply(c, reply, succeeded, clientIP)
 
-	// new a tunnel to client
+	// Create a tunnel link to npc; pass SOCKS5 UDP frames as-is.
 	link := conn.NewLink("udp5", "", s.Task.Client.Cnf.Crypt, s.Task.Client.Cnf.Compress, c.RemoteAddr().String(), s.AllowLocalProxy && s.Task.Target.LocalProxy)
-	link.Option.Timeout = time.Second * 180
+	link.Option.Timeout = 180 * time.Second
 
 	target, err := s.Bridge.SendLinkInfo(s.Task.Client.Id, link, s.Task)
 	if err != nil {
@@ -308,13 +315,13 @@ func (s *TunnelModeServer) handleUDP(c net.Conn) {
 	timeoutConn := conn.NewTimeoutConn(target, link.Option.Timeout)
 	defer timeoutConn.Close()
 	flowConn := conn.NewFlowConn(timeoutConn, s.Task.Flow, s.Task.Client.Flow)
-
 	framed := conn.WrapFramed(flowConn)
 
-	var clientIPSeen net.IP
+	// First-UDP IP locking: set on first datagram we receive, then only accept same IP.
+	var firstUDPIP net.IP
 	var clientAddr atomic.Pointer[net.UDPAddr]
 
-	// local UDP -> tunnel
+	// Local UDP -> tunnel
 	go func() {
 		b := common.BufPoolMax.Get().([]byte)
 		defer common.PutBufPoolMax(b)
@@ -327,20 +334,26 @@ func (s *TunnelModeServer) handleUDP(c net.Conn) {
 				_ = flowConn.Close()
 				return
 			}
-			if clientIPSeen == nil {
-				clientIPSeen = common.NormalizeIP(lAddr.IP)
+
+			// Lock to the first UDP source IP (allow port changes).
+			normIP := common.NormalizeIP(lAddr.IP)
+			if firstUDPIP == nil {
+				firstUDPIP = normIP
+				logs.Debug("lock UDP source ip to %v", firstUDPIP)
 			}
-			if !common.NormalizeIP(lAddr.IP).Equal(clientIPSeen) {
-				logs.Debug("ignore udp from unexpected ip: %v", lAddr.IP)
+			if !normIP.Equal(firstUDPIP) {
+				logs.Debug("ignore udp from unexpected ip: %v (locked to %v)", lAddr.IP, firstUDPIP)
 				continue
 			}
+			// Update the return address to the latest (port may change).
 			clientAddr.Store(lAddr)
 
+			// SOCKS5 UDP: FRAG must be 0 (we don't support fragmentation).
 			if n >= 3 && b[2] != 0 {
 				logs.Warn("socks5 udp frag not supported, drop (frag=%d)", b[2])
 				continue
 			}
-
+			// Size guard vs framed link.
 			if n > conn.MaxFramePayload {
 				logs.Debug("udp datagram too large: %d > %d (drop)", n, conn.MaxFramePayload)
 				continue
@@ -354,7 +367,7 @@ func (s *TunnelModeServer) handleUDP(c net.Conn) {
 		}
 	}()
 
-	// tunnel -> local UDP
+	// Tunnel -> local UDP
 	go func() {
 		b := common.BufPoolMax.Get().([]byte)
 		defer common.PutBufPoolMax(b)
@@ -374,10 +387,14 @@ func (s *TunnelModeServer) handleUDP(c net.Conn) {
 					_ = flowConn.Close()
 					return
 				}
+			} else {
+				// Haven't seen a valid client UDP address yet; drop.
+				logs.Debug("no client udp addr yet, drop %d bytes", n)
 			}
 		}
 	}()
 
+	// Keep TCP control connection alive until client closes it.
 	b := common.BufPoolMax.Get().([]byte)
 	defer common.PutBufPoolMax(b)
 	for {

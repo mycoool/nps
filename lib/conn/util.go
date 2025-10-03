@@ -79,13 +79,14 @@ func IsTempOrTimeout(err error) bool {
 }
 
 func HandleUdp5(ctx context.Context, serverConn net.Conn, timeout time.Duration) {
-	// bind a local udp port
+	// Wrap the TCP tunnel with timeout and framed I/O.
 	defer serverConn.Close()
 	timeoutConn := NewTimeoutConn(serverConn, timeout)
 	defer timeoutConn.Close()
-
 	framed := WrapFramed(timeoutConn)
 
+	// Bind one local UDP socket for all outbound UDP traffic.
+	// Using nil lets the kernel pick family/port.
 	local, err := net.ListenUDP("udp", nil)
 	if err != nil {
 		logs.Error("bind local udp port error %v", err)
@@ -96,10 +97,11 @@ func HandleUdp5(ctx context.Context, serverConn net.Conn, timeout time.Duration)
 	relayCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	// Internet -> tunnel: read UDP responses, encode to SOCKS5-UDP, send through tunnel.
 	go func() {
 		defer cancel()
-		udpBuf := common.BufPoolUdp.Get().([]byte)
-		defer common.BufPoolUdp.Put(udpBuf)
+		buf := common.BufPoolUdp.Get().([]byte)
+		defer common.BufPoolUdp.Put(buf)
 
 		for {
 			select {
@@ -107,30 +109,32 @@ func HandleUdp5(ctx context.Context, serverConn net.Conn, timeout time.Duration)
 				return
 			default:
 			}
-			n, rAddr, err := local.ReadFrom(udpBuf)
+
+			n, rAddr, err := local.ReadFromUDP(buf)
 			if err != nil {
 				if errors.Is(err, net.ErrClosed) {
-					logs.Info("local UDP closed, exiting goroutine")
+					logs.Debug("local UDP closed, exiting goroutine")
 					return
 				}
 				if IsTempOrTimeout(err) {
-					logs.Warn("temporary UDP read error, retrying: %v", err)
+					logs.Debug("temporary UDP read error, retrying: %v", err)
 					continue
 				}
-				logs.Error("read data from remote server error %v", err)
+				logs.Debug("read data from remote server error %v", err)
 				return
 			}
 
+			// Build a standard SOCKS5-UDP packet: RSV(2)=0, FRAG=0, ATYP+ADDR+PORT + DATA.
 			hdr := common.NewUDPHeader(0, 0, common.ToSocksAddr(rAddr))
-			dgram := common.NewUDPDatagram(hdr, udpBuf[:n])
-
+			dgram := common.NewUDPDatagram(hdr, buf[:n])
 			if err := dgram.Write(framed); err != nil {
-				logs.Error("write data to remote error %v", err)
+				logs.Debug("write data to tunnel error %v", err)
 				return
 			}
 		}
 	}()
 
+	// Tunnel -> internet: read framed bytes, parse as SOCKS5-UDP, send via local UDP socket.
 	frameBuf := common.BufPoolMax.Get().([]byte)
 	defer common.PutBufPoolMax(frameBuf)
 
@@ -143,22 +147,35 @@ func HandleUdp5(ctx context.Context, serverConn net.Conn, timeout time.Duration)
 
 		n, err := framed.Read(frameBuf)
 		if err != nil {
-			logs.Error("read udp frame from tunnel error %v", err)
+			logs.Debug("read udp frame from tunnel error %v", err)
 			return
+		}
+		if n < 4 {
+			// Too short to contain a valid SOCKS5-UDP header.
+			logs.Debug("socks5 udp packet too short: %d", n)
+			continue
 		}
 
-		udpData, err := common.ReadUDPDatagram(bytes.NewReader(frameBuf[:n]))
+		// Decode a single SOCKS5-UDP datagram from the frame bytes.
+		dgram, err := common.ReadUDPDatagram(bytes.NewReader(frameBuf[:n]))
 		if err != nil {
-			logs.Error("unpack data error %v", err)
-			return
+			// Drop malformed or fragmented (FRAG != 0) packets.
+			logs.Debug("parse socks5 udp packet error %v", err)
+			continue
 		}
-		rAddr, err := net.ResolveUDPAddr("udp", udpData.Header.Addr.String())
+
+		// Resolve destination and send the payload out.
+		rAddr, err := net.ResolveUDPAddr("udp", dgram.Header.Addr.String())
 		if err != nil {
-			logs.Error("build remote addr err %v", err)
-			continue // drop silently
+			logs.Debug("resolve dest addr %q error %v", dgram.Header.Addr.String(), err)
+			continue
 		}
-		if _, err := local.WriteTo(udpData.Data, rAddr); err != nil {
-			logs.Error("write data to remote %v error %v", rAddr, err)
+		if _, err := local.WriteTo(dgram.Data, rAddr); err != nil {
+			if IsTempOrTimeout(err) {
+				logs.Debug("temporary UDP write error to %v, retrying: %v", rAddr, err)
+				continue
+			}
+			logs.Debug("write udp to %v error %v", rAddr, err)
 			return
 		}
 	}
