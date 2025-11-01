@@ -200,6 +200,8 @@ func dealHost(s string) *file.Host {
 			h.Host = item[1]
 		case "target_addr":
 			h.Target.TargetStr = strings.Replace(item[1], ",", "\n", -1)
+		case "proxy_protocol":
+			h.Target.ProxyProtocol = common.GetIntNoErrByStr(item[1])
 		case "host_change":
 			h.HostChange = item[1]
 		case "scheme":
@@ -300,6 +302,8 @@ func dealTunnel(s string) *file.Tunnel {
 			t.Mode = item[1]
 		case "target_addr":
 			t.Target.TargetStr = strings.Replace(item[1], ",", "\n", -1)
+		case "proxy_protocol":
+			t.Target.ProxyProtocol = common.GetIntNoErrByStr(item[1])
 		case "target_port":
 			t.Target.TargetStr = item[1]
 		case "target_ip":
