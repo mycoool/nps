@@ -130,6 +130,9 @@ func (s *HttpProxy) Start() error {
 			logs.Error("Failed to start HTTPS listener: %v", err)
 			os.Exit(0)
 		}
+		if s.HttpServer == nil {
+			s.HttpServer = NewHttpServer(s, nil)
+		}
 		s.HttpsServer = NewHttpsServer(s.HttpServer, httpsListener)
 		logs.Info("HTTPS server listening on port %d", s.HttpsPort)
 		go func() {
