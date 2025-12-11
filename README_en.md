@@ -1,4 +1,4 @@
-# NPS Intranet Tunneling
+# NPS Intranet Tunneling (Enhanced)
 
 [![GitHub Stars](https://img.shields.io/github/stars/djylb/nps.svg)](https://github.com/djylb/nps)
 [![GitHub Forks](https://img.shields.io/github/forks/djylb/nps.svg)](https://github.com/djylb/nps)
