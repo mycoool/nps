@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/djylb/nps/lib/common"
+	"github.com/mycoool/nps/lib/common"
 )
 
 type packet struct {

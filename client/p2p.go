@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/djylb/nps/lib/common"
-	"github.com/djylb/nps/lib/conn"
-	"github.com/djylb/nps/lib/logs"
+	"github.com/mycoool/nps/lib/common"
+	"github.com/mycoool/nps/lib/conn"
+	"github.com/mycoool/nps/lib/logs"
 )
 
 func handleP2PUdp(pCtx context.Context, localAddr, rAddr, md5Password, sendRole, sendMode, sendData string,

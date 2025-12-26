@@ -7,10 +7,10 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/djylb/nps/lib/conn"
-	"github.com/djylb/nps/lib/logs"
-	"github.com/djylb/nps/lib/mux"
-	"github.com/djylb/nps/lib/pool"
+	"github.com/mycoool/nps/lib/conn"
+	"github.com/mycoool/nps/lib/logs"
+	"github.com/mycoool/nps/lib/mux"
+	"github.com/mycoool/nps/lib/pool"
 	"github.com/quic-go/quic-go"
 )
 

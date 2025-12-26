@@ -7,13 +7,13 @@ import (
 	"unsafe"
 
 	"github.com/beego/beego"
-	"github.com/djylb/nps/bridge"
-	"github.com/djylb/nps/lib/common"
-	"github.com/djylb/nps/lib/conn"
-	"github.com/djylb/nps/lib/logs"
-	"github.com/djylb/nps/server/connection"
-	"github.com/djylb/nps/server/proxy"
-	"github.com/djylb/nps/server/tool"
+	"github.com/mycoool/nps/bridge"
+	"github.com/mycoool/nps/lib/common"
+	"github.com/mycoool/nps/lib/conn"
+	"github.com/mycoool/nps/lib/logs"
+	"github.com/mycoool/nps/server/connection"
+	"github.com/mycoool/nps/server/proxy"
+	"github.com/mycoool/nps/server/tool"
 )
 
 var _ = unsafe.Sizeof(0)

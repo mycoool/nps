@@ -13,12 +13,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/djylb/nps/lib/common"
-	"github.com/djylb/nps/lib/conn"
-	"github.com/djylb/nps/lib/file"
-	"github.com/djylb/nps/lib/goroutine"
-	"github.com/djylb/nps/lib/logs"
-	"github.com/djylb/nps/server/proxy"
+	"github.com/mycoool/nps/lib/common"
+	"github.com/mycoool/nps/lib/conn"
+	"github.com/mycoool/nps/lib/file"
+	"github.com/mycoool/nps/lib/goroutine"
+	"github.com/mycoool/nps/lib/logs"
+	"github.com/mycoool/nps/server/proxy"
 )
 
 type ctxKey string

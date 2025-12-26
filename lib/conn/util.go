@@ -14,12 +14,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/djylb/nps/lib/common"
-	"github.com/djylb/nps/lib/crypt"
-	"github.com/djylb/nps/lib/file"
-	"github.com/djylb/nps/lib/goroutine"
-	"github.com/djylb/nps/lib/logs"
-	"github.com/djylb/nps/lib/rate"
+	"github.com/mycoool/nps/lib/common"
+	"github.com/mycoool/nps/lib/crypt"
+	"github.com/mycoool/nps/lib/file"
+	"github.com/mycoool/nps/lib/goroutine"
+	"github.com/mycoool/nps/lib/logs"
+	"github.com/mycoool/nps/lib/rate"
 	"github.com/xtaci/kcp-go/v5"
 )
 

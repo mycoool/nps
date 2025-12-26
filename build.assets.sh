@@ -14,7 +14,6 @@ sudo apt-get install -y gcc-mingw-w64-i686 gcc-multilib
 COMMON_LDFLAGS="-s -w -extldflags -static -extldflags -static"
 
 TARGETS=(
-  "android arm64"
   "darwin amd64"
   "darwin arm64"
   "freebsd 386"
@@ -86,7 +85,7 @@ build_binary() {
 
   local build_ldflags="$COMMON_LDFLAGS"
   if [[ -n "$arch_tag" ]]; then
-    build_ldflags+=" -X 'github.com/djylb/nps/lib/install.BuildTarget=${arch_tag}'"
+    build_ldflags+=" -X 'github.com/mycoool/nps/lib/install.BuildTarget=${arch_tag}'"
   fi
 
   if [[ -n "$envstr" ]]; then

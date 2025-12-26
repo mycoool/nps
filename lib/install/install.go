@@ -276,7 +276,7 @@ func downloadLatest(bin string) string {
 		}
 	} else {
 		urls = []string{
-			fmt.Sprintf("https://github.com/djylb/nps/releases/download/%s/%s", version, filename),
+			fmt.Sprintf("https://github.com/mycoool/nps/releases/download/%s/%s", version, filename),
 			fmt.Sprintf("https://cdn.jsdelivr.net/gh/mycoool/nps-mirror@%s/%s", version, filename),
 			fmt.Sprintf("https://fastly.jsdelivr.net/gh/mycoool/nps-mirror@%s/%s", version, filename),
 			fmt.Sprintf("https://gcore.jsdelivr.net/gh/mycoool/nps-mirror@%s/%s", version, filename),

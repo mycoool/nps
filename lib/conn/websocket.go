@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/djylb/nps/lib/common"
+	"github.com/mycoool/nps/lib/common"
 	"github.com/gorilla/websocket"
 )
 

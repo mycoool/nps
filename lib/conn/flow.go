@@ -6,7 +6,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/djylb/nps/lib/file"
+	"github.com/mycoool/nps/lib/file"
 )
 
 type LenConn struct {

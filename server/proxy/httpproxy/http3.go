@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/djylb/nps/lib/conn"
-	"github.com/djylb/nps/lib/file"
-	"github.com/djylb/nps/lib/logs"
-	"github.com/djylb/nps/server/connection"
+	"github.com/mycoool/nps/lib/conn"
+	"github.com/mycoool/nps/lib/file"
+	"github.com/mycoool/nps/lib/logs"
+	"github.com/mycoool/nps/server/connection"
 	"github.com/quic-go/quic-go"
 	"github.com/quic-go/quic-go/http3"
 )
