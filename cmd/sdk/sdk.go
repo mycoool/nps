@@ -1,7 +1,11 @@
+//go:build sdk
+// +build sdk
+
 package main
 
 import (
 	"C"
+	"context"
 
 	"github.com/mycoool/nps/client"
 	"github.com/mycoool/nps/lib/common"
@@ -21,8 +25,8 @@ func StartClientByVerifyKey(serverAddr, verifyKey, connType, proxyUrl *C.char) i
 	if cl != nil {
 		cl.Close()
 	}
-	cl = client.NewRPClient(C.GoString(serverAddr), C.GoString(verifyKey), C.GoString(connType), C.GoString(proxyUrl), nil, 60)
-	cl.Start()
+	cl = client.NewRPClient(C.GoString(serverAddr), C.GoString(verifyKey), C.GoString(connType), C.GoString(proxyUrl), "", nil, 60, nil)
+	cl.Start(context.Background())
 	return 1
 }
 

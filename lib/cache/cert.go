@@ -9,6 +9,8 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	"github.com/djylb/nps/lib/common"
 )
 
 type certEntry struct {
@@ -156,13 +158,15 @@ func (m *CertManager) Get(certInput, keyInput, mode, hash string) (*tls.Certific
 	var cert tls.Certificate
 	var err error
 	if isFile {
-		if _, err1 := os.Stat(certInput); err1 != nil {
+		certPath := common.GetPath(certInput)
+		keyPath := common.GetPath(keyInput)
+		if _, err1 := os.Stat(certPath); err1 != nil {
 			return nil, errors.New("cert file not found")
 		}
-		if _, err2 := os.Stat(keyInput); err2 != nil {
+		if _, err2 := os.Stat(keyPath); err2 != nil {
 			return nil, errors.New("key file not found")
 		}
-		cert, err = tls.LoadX509KeyPair(certInput, keyInput)
+		cert, err = tls.LoadX509KeyPair(certPath, keyPath)
 	} else {
 		cert, err = tls.X509KeyPair([]byte(certInput), []byte(keyInput))
 	}

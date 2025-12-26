@@ -2,9 +2,9 @@ package controllers
 
 import (
 	"encoding/hex"
-	"time"
 
 	"github.com/beego/beego"
+	"github.com/mycoool/nps/lib/common"
 	"github.com/mycoool/nps/lib/crypt"
 )
 
@@ -36,7 +36,20 @@ func (s *AuthController) GetAuthKey() {
 
 func (s *AuthController) GetTime() {
 	m := make(map[string]interface{})
-	m["time"] = time.Now().Unix()
+	m["time"] = common.TimeNow().Unix()
+	s.Data["json"] = m
+	s.ServeJSON()
+}
+
+func (s *AuthController) GetCert() {
+	m := make(map[string]interface{})
+	var err error
+	m["cert"], err = crypt.GetRSAPublicKeyPEM()
+	if err != nil {
+		m["status"] = 0
+	} else {
+		m["status"] = 1
+	}
 	s.Data["json"] = m
 	s.ServeJSON()
 }

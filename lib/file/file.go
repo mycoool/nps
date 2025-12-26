@@ -11,12 +11,10 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/beego/beego"
 	"github.com/mycoool/nps/lib/common"
 	"github.com/mycoool/nps/lib/crypt"
 	"github.com/mycoool/nps/lib/logs"
 	"github.com/mycoool/nps/lib/rate"
-	"github.com/mycoool/nps/lib/version"
 )
 
 func NewJsonDb(runPath string) *JsonDb {
@@ -56,6 +54,7 @@ func (s *JsonDb) LoadTaskFromJsonFile() {
 		if post.Password != "" {
 			TaskPasswordIndex.Add(crypt.Md5(post.Password), post.Id)
 		}
+		post.NowConn = 0
 		switch post.Mode {
 		case "socks5":
 			post.Mode = "mixProxy"
@@ -66,6 +65,9 @@ func (s *JsonDb) LoadTaskFromJsonFile() {
 			post.HttpProxy = true
 			post.Socks5Proxy = false
 		}
+		if post.TargetType != common.CONN_TCP && post.TargetType != common.CONN_UDP {
+			post.TargetType = common.CONN_ALL
+		}
 		s.Tasks.Store(post.Id, post)
 		if post.Id > int(s.TaskIncreaseId) {
 			s.TaskIncreaseId = int32(post.Id)
@@ -75,24 +77,6 @@ func (s *JsonDb) LoadTaskFromJsonFile() {
 
 func (s *JsonDb) LoadClientFromJsonFile() {
 	Blake2bVkeyIndex.Clear()
-	if allowLocalProxy, _ := beego.AppConfig.Bool("allow_local_proxy"); allowLocalProxy {
-		if _, err := s.GetClient(-1); err != nil {
-			local := new(Client)
-			local.Id = -1
-			local.Remark = "Local Proxy"
-			local.Addr = "127.0.0.1"
-			local.Cnf = new(Config)
-			local.Flow = new(Flow)
-			local.Rate = new(rate.Rate)
-			local.Status = true
-			local.ConfigConnAllow = true
-			local.Version = version.VERSION
-			local.VerifyKey = "localproxy"
-			s.Clients.Store(local.Id, local)
-			s.ClientIncreaseId = 0
-			logs.Info("Auto create local proxy client.")
-		}
-	}
 	loadSyncMapFromFile(s.ClientFilePath, Client{}, func(v interface{}) {
 		post := v.(*Client)
 		if post.Id > 0 {
@@ -126,6 +110,7 @@ func (s *JsonDb) LoadHostFromJsonFile() {
 		if post.CertHash == "" {
 			post.CertHash = crypt.FNV1a64(post.CertType, post.CertFile, post.KeyFile)
 		}
+		post.NowConn = 0
 		s.Hosts.Store(post.Id, post)
 		HostIndex.Add(post.Host, post.Id)
 		if post.Id > int(s.HostIncreaseId) {
@@ -157,7 +142,7 @@ var hostLock sync.Mutex
 
 func (s *JsonDb) StoreHostToJsonFile() {
 	hostLock.Lock()
-	storeSyncMapToFile(s.Hosts, s.HostFilePath)
+	storeSyncMapToFile(&s.Hosts, s.HostFilePath)
 	hostLock.Unlock()
 }
 
@@ -165,7 +150,7 @@ var taskLock sync.Mutex
 
 func (s *JsonDb) StoreTasksToJsonFile() {
 	taskLock.Lock()
-	storeSyncMapToFile(s.Tasks, s.TaskFilePath)
+	storeSyncMapToFile(&s.Tasks, s.TaskFilePath)
 	taskLock.Unlock()
 }
 
@@ -173,7 +158,7 @@ var clientLock sync.Mutex
 
 func (s *JsonDb) StoreClientsToJsonFile() {
 	clientLock.Lock()
-	storeSyncMapToFile(s.Clients, s.ClientFilePath)
+	storeSyncMapToFile(&s.Clients, s.ClientFilePath)
 	clientLock.Unlock()
 }
 
@@ -340,7 +325,7 @@ func createEmptyFile(filePath string) error {
 	return nil
 }
 
-func storeSyncMapToFile(m sync.Map, filePath string) {
+func storeSyncMapToFile(m *sync.Map, filePath string) {
 	tmpFilePath := filePath + ".tmp"
 	file, err := os.Create(tmpFilePath)
 	if err != nil {

@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/mycoool/nps/lib/file"
 	"github.com/mycoool/nps/lib/rate"
 	"github.com/mycoool/nps/server"
+	"github.com/skip2/go-qrcode"
 )
 
 type ClientController struct {
@@ -67,6 +69,7 @@ func (s *ClientController) Add() {
 			MaxConn:         s.GetIntNoErr("max_conn"),
 			WebUserName:     s.getEscapeString("web_username"),
 			WebPassword:     s.getEscapeString("web_password"),
+			WebTotpSecret:   s.getEscapeString("web_totp_secret"),
 			MaxTunnelNum:    s.GetIntNoErr("max_tunnel"),
 			Flow: &file.Flow{
 				ExportFlow: 0,
@@ -83,6 +86,20 @@ func (s *ClientController) Add() {
 		s.AjaxOkWithId("add success", id)
 	}
 }
+
+func (s *ClientController) PingClient() {
+	id := s.GetIntNoErr("id")
+	data := make(map[string]interface{})
+	if _, err := file.GetDb().GetClient(id); err != nil {
+		data["code"] = 0
+	} else {
+		data["code"] = 1
+		data["rtt"] = server.PingClient(id, s.Ctx.Request.RemoteAddr)
+	}
+	s.Data["json"] = data
+	s.ServeJSON()
+}
+
 func (s *ClientController) GetClient() {
 	if s.Ctx.Request.Method == "POST" {
 		id := s.GetIntNoErr("id")
@@ -127,6 +144,7 @@ func (s *ClientController) Edit() {
 					s.AjaxErr("Vkey duplicate, please reset")
 					return
 				}
+				file.Blake2bVkeyIndex.Remove(crypt.Blake2b(c.VerifyKey))
 				c.VerifyKey = s.getEscapeString("vkey")
 				file.Blake2bVkeyIndex.Add(crypt.Blake2b(c.VerifyKey), c.Id)
 				c.Flow.FlowLimit = int64(s.GetIntNoErr("flow_limit"))
@@ -149,6 +167,8 @@ func (s *ClientController) Edit() {
 				c.WebUserName = s.getEscapeString("web_username")
 			}
 			c.WebPassword = s.getEscapeString("web_password")
+			c.WebTotpSecret = s.getEscapeString("web_totp_secret")
+			c.EnsureWebPassword()
 			c.ConfigConnAllow = s.GetBoolNoErr("config_conn_allow")
 			if c.Rate != nil {
 				c.Rate.Stop()
@@ -285,4 +305,29 @@ func (s *ClientController) Del() {
 	server.DelTunnelAndHostByClientId(id, false)
 	server.DelClientConnect(id)
 	s.AjaxOk("delete success")
+}
+
+func (s *ClientController) Qr() {
+	text := s.GetString("text")
+	account := s.GetString("account")
+	secret := s.GetString("secret")
+	if text == "" && (account == "" || secret == "") {
+		s.CustomAbort(400, "missing text")
+		return
+	}
+	if text != "" {
+		if decoded, err := url.QueryUnescape(text); err == nil {
+			text = decoded
+		}
+	} else {
+		issuer := beego.AppConfig.String("appname")
+		text = crypt.BuildTotpUri(issuer, account, secret)
+	}
+	png, err := qrcode.Encode(text, qrcode.Medium, 256)
+	if err != nil {
+		s.CustomAbort(500, "QR encode failed")
+		return
+	}
+	s.Ctx.Output.Header("Content-Type", "image/png")
+	s.Ctx.Output.Body(png)
 }

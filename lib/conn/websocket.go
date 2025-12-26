@@ -8,11 +8,13 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/djylb/nps/lib/common"
 	"github.com/gorilla/websocket"
 )
 
 type WsConn struct {
 	*websocket.Conn
+	RealIP  string
 	readBuf []byte
 }
 
@@ -56,11 +58,21 @@ func (c *WsConn) Write(p []byte) (int, error) {
 	return n, w.Close()
 }
 
-func (c *WsConn) Close() error         { return c.Conn.Close() }
-func (c *WsConn) LocalAddr() net.Addr  { return c.Conn.UnderlyingConn().LocalAddr() }
-func (c *WsConn) RemoteAddr() net.Addr { return c.Conn.UnderlyingConn().RemoteAddr() }
+func (c *WsConn) Close() error        { return c.Conn.Close() }
+func (c *WsConn) LocalAddr() net.Addr { return c.Conn.NetConn().LocalAddr() }
+func (c *WsConn) RemoteAddr() net.Addr {
+	if c.RealIP != "" {
+		if ip := net.ParseIP(c.RealIP); ip != nil {
+			return &net.TCPAddr{
+				IP:   ip,
+				Port: 0,
+			}
+		}
+	}
+	return c.Conn.NetConn().RemoteAddr()
+}
 func (c *WsConn) SetDeadline(t time.Time) error {
-	c.Conn.SetReadDeadline(t)
+	_ = c.Conn.SetReadDeadline(t)
 	return c.Conn.SetWriteDeadline(t)
 }
 func (c *WsConn) SetReadDeadline(t time.Time) error  { return c.Conn.SetReadDeadline(t) }
@@ -72,10 +84,13 @@ type httpListener struct {
 	addr     net.Addr
 }
 
-func NewWSListener(base net.Listener, path string) net.Listener {
+func NewWSListener(base net.Listener, path, trustedIps, realIpHeader string) net.Listener {
 	ch := make(chan net.Conn, 16)
 	hl := &httpListener{acceptCh: ch, closeCh: make(chan struct{}), addr: base.Addr()}
 	upgrader := websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
+	if path == "" {
+		path = "/"
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 		select {
@@ -83,25 +98,33 @@ func NewWSListener(base net.Listener, path string) net.Listener {
 			return
 		default:
 		}
+		realIP := GetRealIP(r, realIpHeader)
 		ws, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			return
 		}
-		ch <- NewWsConn(ws)
+		c := NewWsConn(ws)
+		if common.IsTrustedProxy(trustedIps, r.RemoteAddr) {
+			c.RealIP = realIP
+		}
+		ch <- c
 	})
 	srv := &http.Server{Handler: mux}
 	go srv.Serve(base)
 	go func() {
 		<-hl.closeCh
-		srv.Close()
+		_ = srv.Close()
 	}()
 	return hl
 }
 
-func NewWSSListener(base net.Listener, path string, cert tls.Certificate) net.Listener {
+func NewWSSListener(base net.Listener, path string, cert tls.Certificate, trustedIps, realIpHeader string) net.Listener {
 	ch := make(chan net.Conn, 16)
 	hl := &httpListener{acceptCh: ch, closeCh: make(chan struct{}), addr: base.Addr()}
 	upgrader := websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
+	if path == "" {
+		path = "/"
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 		select {
@@ -109,18 +132,23 @@ func NewWSSListener(base net.Listener, path string, cert tls.Certificate) net.Li
 			return
 		default:
 		}
+		realIP := GetRealIP(r, realIpHeader)
 		ws, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			return
 		}
-		ch <- NewWsConn(ws)
+		c := NewWsConn(ws)
+		if common.IsTrustedProxy(trustedIps, r.RemoteAddr) {
+			c.RealIP = realIP
+		}
+		ch <- c
 	})
 	tlsConfig := &tls.Config{Certificates: []tls.Certificate{cert}}
 	srv := &http.Server{Handler: mux, TLSConfig: tlsConfig}
 	go srv.Serve(tls.NewListener(base, tlsConfig))
 	go func() {
 		<-hl.closeCh
-		srv.Close()
+		_ = srv.Close()
 	}()
 	return hl
 }
@@ -143,27 +171,38 @@ func (hl *httpListener) Addr() net.Addr {
 	return hl.addr
 }
 
-func DialWS(rawConn net.Conn, urlStr string, timeout time.Duration) (*websocket.Conn, *http.Response, error) {
+func DialWS(rawConn net.Conn, urlStr, host string, timeout time.Duration) (*websocket.Conn, *http.Response, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
+	h := http.Header{}
+	if host != "" {
+		h.Set("Host", host)
+	}
 	dialer := websocket.Dialer{
 		HandshakeTimeout: timeout,
 		NetDialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			return rawConn, nil
 		},
 	}
-	return dialer.DialContext(ctx, urlStr, nil)
+	return dialer.DialContext(ctx, urlStr, h)
 }
 
-func DialWSS(rawConn net.Conn, urlStr string, timeout time.Duration) (*websocket.Conn, *http.Response, error) {
+func DialWSS(rawConn net.Conn, urlStr, host, sni string, timeout time.Duration) (*websocket.Conn, *http.Response, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
+	h := http.Header{}
+	if host != "" {
+		h.Set("Host", host)
+	}
 	dialer := websocket.Dialer{
 		HandshakeTimeout: timeout,
-		TLSClientConfig:  &tls.Config{InsecureSkipVerify: true},
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+			ServerName:         sni,
+		},
 		NetDialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			return rawConn, nil
 		},
 	}
-	return dialer.DialContext(ctx, urlStr, nil)
+	return dialer.DialContext(ctx, urlStr, h)
 }

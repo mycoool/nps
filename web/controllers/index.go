@@ -1,6 +1,8 @@
 package controllers
 
 import (
+	"fmt"
+	"html/template"
 	"strings"
 
 	"github.com/beego/beego"
@@ -17,6 +19,7 @@ type IndexController struct {
 
 func (s *IndexController) Index() {
 	s.Data["web_base_url"] = beego.AppConfig.String("web_base_url")
+	s.Data["head_custom_code"] = template.HTML(beego.AppConfig.String("head_custom_code"))
 	s.Data["data"] = server.GetDashboardData(true)
 	s.SetInfo("dashboard")
 	s.display("index/index")
@@ -116,14 +119,21 @@ func (s *IndexController) Add() {
 	} else {
 		id := int(file.GetDb().JsonDb.GetTaskId())
 		clientId := s.GetIntNoErr("client_id")
+		isAdmin := s.GetSession("isAdmin").(bool)
+		allowLocal := beego.AppConfig.DefaultBool("allow_user_local", beego.AppConfig.DefaultBool("allow_local_proxy", false)) || isAdmin
+		targetStr := strings.ToLower(strings.TrimSpace(strings.ReplaceAll(s.getEscapeString("target"), "\r\n", "\n")))
+		if !isAdmin && strings.Contains(targetStr, "bridge://") {
+			targetStr = ""
+		}
 		t := &file.Tunnel{
-			Port:     s.GetIntNoErr("port"),
-			ServerIp: s.getEscapeString("server_ip"),
-			Mode:     s.getEscapeString("type"),
+			Port:       s.GetIntNoErr("port"),
+			ServerIp:   s.getEscapeString("server_ip"),
+			Mode:       s.getEscapeString("type"),
+			TargetType: s.getEscapeString("target_type"),
 			Target: &file.Target{
-				TargetStr:     strings.ReplaceAll(s.getEscapeString("target"), "\r\n", "\n"),
+				TargetStr:     targetStr,
 				ProxyProtocol: s.GetIntNoErr("proxy_protocol"),
-				LocalProxy:    (clientId > 0 && s.GetBoolNoErr("local_proxy")) || clientId <= 0,
+				LocalProxy:    (clientId > 0 && s.GetBoolNoErr("local_proxy") && allowLocal) || clientId <= 0,
 			},
 			UserAuth: &file.MultiAccount{
 				Content:    s.getEscapeString("auth"),
@@ -219,12 +229,23 @@ func (s *IndexController) Edit() {
 					return
 				}
 			}
+			isAdmin := s.GetSession("isAdmin").(bool)
+			allowLocal := beego.AppConfig.DefaultBool("allow_user_local", beego.AppConfig.DefaultBool("allow_local_proxy", false)) || isAdmin
+			targetStr := strings.ToLower(strings.TrimSpace(strings.ReplaceAll(s.getEscapeString("target"), "\r\n", "\n")))
+			if !isAdmin && strings.Contains(targetStr, "bridge://") {
+				if t.Target != nil {
+					targetStr = t.Target.TargetStr
+				} else {
+					targetStr = ""
+				}
+			}
 			t.ServerIp = s.getEscapeString("server_ip")
 			t.Mode = s.getEscapeString("type")
-			t.Target = &file.Target{TargetStr: strings.ReplaceAll(s.getEscapeString("target"), "\r\n", "\n")}
+			t.TargetType = s.getEscapeString("target_type")
+			t.Target = &file.Target{TargetStr: targetStr}
 			t.UserAuth = &file.MultiAccount{Content: s.getEscapeString("auth"), AccountMap: common.DealMultiUser(s.getEscapeString("auth"))}
-			t.Password = s.getEscapeString("password")
 			t.Id = id
+			t.Password = s.getEscapeString("password")
 			t.LocalPath = s.getEscapeString("local_path")
 			t.StripPre = s.getEscapeString("strip_pre")
 			t.HttpProxy = s.GetBoolNoErr("enable_http")
@@ -237,10 +258,10 @@ func (s *IndexController) Edit() {
 				t.Flow.InletFlow = 0
 			}
 			t.Target.ProxyProtocol = s.GetIntNoErr("proxy_protocol")
-			t.Target.LocalProxy = (clientId > 0 && s.GetBoolNoErr("local_proxy")) || clientId <= 0
-			file.GetDb().UpdateTask(t)
-			server.StopServer(t.Id)
-			server.StartTask(t.Id)
+			t.Target.LocalProxy = (clientId > 0 && s.GetBoolNoErr("local_proxy") && allowLocal) || clientId <= 0
+			_ = file.GetDb().UpdateTask(t)
+			_ = server.StopServer(t.Id)
+			_ = server.StartTask(t.Id)
 		}
 		s.AjaxOk("modified success")
 	}
@@ -299,40 +320,43 @@ func (s *IndexController) Clear() {
 	s.AjaxErr("modified fail")
 }
 
-func changeStatus(id int, name, action string) (err error) {
-	if t, err := file.GetDb().GetTask(id); err != nil {
+func changeStatus(id int, name, action string) error {
+	t, err := file.GetDb().GetTask(id)
+	if err != nil {
 		return err
-	} else {
-		if name == "http" {
-			if action == "start" {
-				t.HttpProxy = true
-			}
-			if action == "stop" {
-				t.HttpProxy = false
-			}
-		}
-		if name == "socks5" {
-			if action == "start" {
-				t.Socks5Proxy = true
-			}
-			if action == "stop" {
-				t.Socks5Proxy = false
-			}
-		}
-		if name == "flow" && action == "clear" {
-			t.Flow.ExportFlow = 0
-			t.Flow.InletFlow = 0
-		}
-		if name == "flow_limit" && action == "clear" {
-			t.Flow.FlowLimit = 0
-		}
-		if name == "time_limit" && action == "clear" {
-			t.Flow.TimeLimit = common.GetTimeNoErrByStr("")
-		}
-		file.GetDb().UpdateTask(t)
-		server.StopServer(t.Id)
-		server.StartTask(t.Id)
 	}
+	a := strings.ToLower(strings.TrimSpace(action))
+	switch name {
+	case "http":
+		if err := applyBoolAction(&t.HttpProxy, a); err != nil {
+			return err
+		}
+	case "socks5":
+		if err := applyBoolAction(&t.Socks5Proxy, a); err != nil {
+			return err
+		}
+	case "flow":
+		if a != "clear" {
+			return fmt.Errorf("unsupported action %q for %s", a, name)
+		}
+		t.Flow.ExportFlow = 0
+		t.Flow.InletFlow = 0
+	case "flow_limit":
+		if a != "clear" {
+			return fmt.Errorf("unsupported action %q for %s", a, name)
+		}
+		t.Flow.FlowLimit = 0
+	case "time_limit":
+		if a != "clear" {
+			return fmt.Errorf("unsupported action %q for %s", a, name)
+		}
+		t.Flow.TimeLimit = common.GetTimeNoErrByStr("")
+	default:
+		return fmt.Errorf("unknown name: %q", name)
+	}
+	_ = file.GetDb().UpdateTask(t)
+	//server.StopServer(t.Id)
+	//server.StartTask(t.Id)
 	return nil
 }
 
@@ -369,6 +393,7 @@ func (s *IndexController) GetHost() {
 
 func (s *IndexController) DelHost() {
 	id := s.GetIntNoErr("id")
+	server.HttpProxyCache.Remove(id)
 	if err := file.GetDb().DelHost(id); err != nil {
 		s.AjaxErr("delete error")
 	}
@@ -377,6 +402,14 @@ func (s *IndexController) DelHost() {
 
 func (s *IndexController) StartHost() {
 	id := s.GetIntNoErr("id")
+	server.HttpProxyCache.Remove(id)
+	mode := s.getEscapeString("mode")
+	if mode != "" {
+		if err := changeHostStatus(id, mode, "start"); err != nil {
+			s.AjaxErr("modified fail")
+		}
+		s.AjaxOk("modified success")
+	}
 	h, err := file.GetDb().GetHostById(id)
 	if err != nil {
 		s.error()
@@ -389,6 +422,14 @@ func (s *IndexController) StartHost() {
 
 func (s *IndexController) StopHost() {
 	id := s.GetIntNoErr("id")
+	server.HttpProxyCache.Remove(id)
+	mode := s.getEscapeString("mode")
+	if mode != "" {
+		if err := changeHostStatus(id, mode, "stop"); err != nil {
+			s.AjaxErr("modified fail")
+		}
+		s.AjaxOk("modified success")
+	}
 	h, err := file.GetDb().GetHostById(id)
 	if err != nil {
 		s.error()
@@ -401,6 +442,7 @@ func (s *IndexController) StopHost() {
 
 func (s *IndexController) ClearHost() {
 	id := s.GetIntNoErr("id")
+	server.HttpProxyCache.Remove(id)
 	mode := s.getEscapeString("mode")
 	if mode != "" {
 		if err := changeHostStatus(id, mode, "clear"); err != nil {
@@ -419,35 +461,45 @@ func (s *IndexController) AddHost() {
 		s.display("index/hadd")
 	} else {
 		id := int(file.GetDb().JsonDb.GetHostId())
+		isAdmin := s.GetSession("isAdmin").(bool)
+		allowLocal := beego.AppConfig.DefaultBool("allow_user_local", beego.AppConfig.DefaultBool("allow_local_proxy", false)) || isAdmin
 		clientId := s.GetIntNoErr("client_id")
+		targetStr := strings.ToLower(strings.TrimSpace(strings.ReplaceAll(s.getEscapeString("target"), "\r\n", "\n")))
+		if !isAdmin && strings.Contains(targetStr, "bridge://") {
+			targetStr = ""
+		}
 		h := &file.Host{
 			Id:   id,
 			Host: s.getEscapeString("host"),
 			Target: &file.Target{
-				TargetStr:     strings.ReplaceAll(s.getEscapeString("target"), "\r\n", "\n"),
+				TargetStr:     targetStr,
 				ProxyProtocol: s.GetIntNoErr("proxy_protocol"),
-				LocalProxy:    (clientId > 0 && s.GetBoolNoErr("local_proxy")) || clientId <= 0,
+				LocalProxy:    (clientId > 0 && s.GetBoolNoErr("local_proxy") && allowLocal) || clientId <= 0,
 			},
 			UserAuth: &file.MultiAccount{
 				Content:    s.getEscapeString("auth"),
 				AccountMap: common.DealMultiUser(s.getEscapeString("auth")),
 			},
-			HeaderChange: s.getEscapeString("header"),
-			HostChange:   s.getEscapeString("hostchange"),
-			Remark:       s.getEscapeString("remark"),
-			Location:     s.getEscapeString("location"),
-			PathRewrite:  s.getEscapeString("path_rewrite"),
+			HeaderChange:     s.getEscapeString("header"),
+			RespHeaderChange: s.getEscapeString("resp_header"),
+			HostChange:       s.getEscapeString("hostchange"),
+			Remark:           s.getEscapeString("remark"),
+			Location:         s.getEscapeString("location"),
+			PathRewrite:      s.getEscapeString("path_rewrite"),
+			RedirectURL:      s.getEscapeString("redirect_url"),
 			Flow: &file.Flow{
 				FlowLimit: int64(s.GetIntNoErr("flow_limit")),
 				TimeLimit: common.GetTimeNoErrByStr(s.getEscapeString("time_limit")),
 			},
 			Scheme:         s.getEscapeString("scheme"),
 			HttpsJustProxy: s.GetBoolNoErr("https_just_proxy"),
+			TlsOffload:     s.GetBoolNoErr("tls_offload"),
 			AutoSSL:        s.GetBoolNoErr("auto_ssl"),
 			KeyFile:        s.getEscapeString("key_file"),
 			CertFile:       s.getEscapeString("cert_file"),
 			AutoHttps:      s.GetBoolNoErr("auto_https"),
 			AutoCORS:       s.GetBoolNoErr("auto_cors"),
+			CompatMode:     s.GetBoolNoErr("compat_mode"),
 			TargetIsHttps:  s.GetBoolNoErr("target_is_https"),
 		}
 		var err error
@@ -467,6 +519,7 @@ func (s *IndexController) AddHost() {
 
 func (s *IndexController) EditHost() {
 	id := s.GetIntNoErr("id")
+	server.HttpProxyCache.Remove(id)
 	if s.Ctx.Request.Method == "GET" {
 		s.Data["menu"] = "host"
 		if h, err := file.GetDb().GetHostById(id); err != nil {
@@ -486,12 +539,16 @@ func (s *IndexController) EditHost() {
 			s.error()
 		} else {
 			oleHost := h.Host
-			if h.Host != s.getEscapeString("host") || h.Location != s.getEscapeString("location") || h.Scheme != s.getEscapeString("scheme") {
+			scheme := s.getEscapeString("scheme")
+			if scheme != "all" && scheme != "http" && scheme != "https" {
+				scheme = "all"
+			}
+			if h.Host != s.getEscapeString("host") || h.Location != s.getEscapeString("location") || h.Scheme != scheme {
 				tmpHost := new(file.Host)
 				tmpHost.Id = h.Id
 				tmpHost.Host = s.getEscapeString("host")
 				tmpHost.Location = s.getEscapeString("location")
-				tmpHost.Scheme = s.getEscapeString("scheme")
+				tmpHost.Scheme = scheme
 				if file.GetDb().IsHostExist(tmpHost) {
 					s.AjaxErr("host has exist")
 					return
@@ -503,21 +560,34 @@ func (s *IndexController) EditHost() {
 			} else {
 				h.Client = client
 			}
+			isAdmin := s.GetSession("isAdmin").(bool)
+			allowLocal := beego.AppConfig.DefaultBool("allow_user_local", beego.AppConfig.DefaultBool("allow_local_proxy", false)) || isAdmin
+			targetStr := strings.ToLower(strings.TrimSpace(strings.ReplaceAll(s.getEscapeString("target"), "\r\n", "\n")))
+			if !isAdmin && strings.Contains(targetStr, "bridge://") {
+				if h.Target != nil {
+					targetStr = h.Target.TargetStr
+				} else {
+					targetStr = ""
+				}
+			}
 			h.Host = s.getEscapeString("host")
-			h.Target = &file.Target{TargetStr: strings.ReplaceAll(s.getEscapeString("target"), "\r\n", "\n")}
+			h.Target = &file.Target{TargetStr: targetStr}
 			h.UserAuth = &file.MultiAccount{Content: s.getEscapeString("auth"), AccountMap: common.DealMultiUser(s.getEscapeString("auth"))}
 			h.HeaderChange = s.getEscapeString("header")
+			h.RespHeaderChange = s.getEscapeString("resp_header")
 			h.HostChange = s.getEscapeString("hostchange")
 			h.Remark = s.getEscapeString("remark")
 			h.Location = s.getEscapeString("location")
 			h.PathRewrite = s.getEscapeString("path_rewrite")
-			h.Scheme = s.getEscapeString("scheme")
+			h.RedirectURL = s.getEscapeString("redirect_url")
+			h.Scheme = scheme
 			h.HttpsJustProxy = s.GetBoolNoErr("https_just_proxy")
+			h.TlsOffload = s.GetBoolNoErr("tls_offload")
 			h.AutoSSL = s.GetBoolNoErr("auto_ssl")
 			h.KeyFile = s.getEscapeString("key_file")
 			h.CertFile = s.getEscapeString("cert_file")
 			h.Target.ProxyProtocol = s.GetIntNoErr("proxy_protocol")
-			h.Target.LocalProxy = (clientId > 0 && s.GetBoolNoErr("local_proxy")) || clientId <= 0
+			h.Target.LocalProxy = (clientId > 0 && s.GetBoolNoErr("local_proxy") && allowLocal) || clientId <= 0
 			h.Flow.FlowLimit = int64(s.GetIntNoErr("flow_limit"))
 			h.Flow.TimeLimit = common.GetTimeNoErrByStr(s.getEscapeString("time_limit"))
 			if s.GetBoolNoErr("flow_reset") {
@@ -526,6 +596,7 @@ func (s *IndexController) EditHost() {
 			}
 			h.AutoHttps = s.GetBoolNoErr("auto_https")
 			h.AutoCORS = s.GetBoolNoErr("auto_cors")
+			h.CompatMode = s.GetBoolNoErr("compat_mode")
 			h.TargetIsHttps = s.GetBoolNoErr("target_is_https")
 			if h.Host != oleHost {
 				file.HostIndex.Remove(oleHost, h.Id)
@@ -540,20 +611,74 @@ func (s *IndexController) EditHost() {
 }
 
 func changeHostStatus(id int, name, action string) (err error) {
-	if h, err := file.GetDb().GetHostById(id); err != nil {
+	h, err := file.GetDb().GetHostById(id)
+	if err != nil {
 		return err
-	} else {
-		if name == "flow" && action == "clear" {
-			h.Flow.ExportFlow = 0
-			h.Flow.InletFlow = 0
+	}
+	a := strings.ToLower(strings.TrimSpace(action))
+	switch name {
+	case "flow":
+		if a != "clear" {
+			return fmt.Errorf("unsupported action %q for %s", a, name)
 		}
-		if name == "flow_limit" && action == "clear" {
-			h.Flow.FlowLimit = 0
+		h.Flow.ExportFlow = 0
+		h.Flow.InletFlow = 0
+	case "flow_limit":
+		if a != "clear" {
+			return fmt.Errorf("unsupported action %q for %s", a, name)
 		}
-		if name == "time_limit" && action == "clear" {
-			h.Flow.TimeLimit = common.GetTimeNoErrByStr("")
+		h.Flow.FlowLimit = 0
+	case "time_limit":
+		if a != "clear" {
+			return fmt.Errorf("unsupported action %q for %s", a, name)
 		}
-		file.GetDb().JsonDb.StoreHostToJsonFile()
+		h.Flow.TimeLimit = common.GetTimeNoErrByStr("")
+	case "auto_ssl":
+		if err := applyBoolAction(&h.AutoSSL, a); err != nil {
+			return err
+		}
+	case "https_just_proxy":
+		if err := applyBoolAction(&h.HttpsJustProxy, a); err != nil {
+			return err
+		}
+	case "tls_offload":
+		if err := applyBoolAction(&h.TlsOffload, a); err != nil {
+			return err
+		}
+	case "auto_https":
+		if err := applyBoolAction(&h.AutoHttps, a); err != nil {
+			return err
+		}
+	case "auto_cors":
+		if err := applyBoolAction(&h.AutoCORS, a); err != nil {
+			return err
+		}
+	case "compat_mode":
+		if err := applyBoolAction(&h.CompatMode, a); err != nil {
+			return err
+		}
+	case "target_is_https":
+		if err := applyBoolAction(&h.TargetIsHttps, a); err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("unknown name: %q", name)
+	}
+	file.GetDb().JsonDb.StoreHostToJsonFile()
+
+	return nil
+}
+
+func applyBoolAction(dst *bool, action string) error {
+	switch action {
+	case "start", "true", "on":
+		*dst = true
+	case "stop", "false", "off":
+		*dst = false
+	case "clear", "turn", "switch":
+		*dst = !*dst
+	default:
+		return fmt.Errorf("unknown action: %q", action)
 	}
 	return nil
 }

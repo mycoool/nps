@@ -2,10 +2,10 @@ package controllers
 
 import (
 	"html"
+	"html/template"
 	"math"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/beego/beego"
 	"github.com/mycoool/nps/bridge"
@@ -24,6 +24,7 @@ type BaseController struct {
 
 func (s *BaseController) Prepare() {
 	s.Data["web_base_url"] = beego.AppConfig.String("web_base_url")
+	s.Data["head_custom_code"] = template.HTML(beego.AppConfig.String("head_custom_code"))
 	controllerName, actionName := s.GetControllerAndAction()
 	s.controllerName = strings.ToLower(controllerName[0 : len(controllerName)-10])
 	s.actionName = strings.ToLower(actionName)
@@ -34,7 +35,7 @@ func (s *BaseController) Prepare() {
 	md5Key := s.getEscapeString("auth_key")
 	timestamp := s.GetIntNoErr("timestamp")
 	configKey := beego.AppConfig.String("auth_key")
-	timeNowUnix := time.Now().Unix()
+	timeNowUnix := common.TimeNow().Unix()
 	if configKey == "" {
 		configKey = crypt.GetRandomString(64)
 	}
@@ -65,12 +66,16 @@ func (s *BaseController) Prepare() {
 	s.Data["allow_multi_ip"], _ = beego.AppConfig.Bool("allow_multi_ip")
 	s.Data["system_info_display"], _ = beego.AppConfig.Bool("system_info_display")
 	s.Data["allow_tunnel_num_limit"], _ = beego.AppConfig.Bool("allow_tunnel_num_limit")
-	s.Data["allow_local_proxy"], _ = beego.AppConfig.Bool("allow_local_proxy")
+	allowLocalProxy := beego.AppConfig.DefaultBool("allow_local_proxy", false)
+	s.Data["allow_local_proxy"] = allowLocalProxy
+	s.Data["allow_user_local"] = beego.AppConfig.DefaultBool("allow_user_local", allowLocalProxy)
+	s.Data["allow_secret_link"], _ = beego.AppConfig.Bool("allow_secret_link")
 	s.Data["allow_user_change_username"], _ = beego.AppConfig.Bool("allow_user_change_username")
 }
 
 func (s *BaseController) display(tpl ...string) {
 	s.Data["web_base_url"] = beego.AppConfig.String("web_base_url")
+	s.Data["head_custom_code"] = template.HTML(beego.AppConfig.String("head_custom_code"))
 	s.Data["version"] = server.GetVersion()
 	s.Data["year"] = server.GetCurrentYear()
 	var tplname string
@@ -83,25 +88,44 @@ func (s *BaseController) display(tpl ...string) {
 		tplname = s.controllerName + "/" + s.actionName + ".html"
 	}
 	ip := s.Ctx.Request.Host
-	s.Data["bridgeType"], s.Data["addr"], s.Data["ip"], s.Data["p"] = GetBestBridge(ip)
+	s.Data["bridgeType"], s.Data["addr"], ip, s.Data["p"] = GetBestBridge(ip)
+	s.Data["ip"] = ip
 	if common.IsWindows() {
 		s.Data["win"] = ".exe"
 	}
 	if beego.AppConfig.DefaultBool("bridge_tcp_show", bridge.ServerTcpEnable) {
-		s.Data["tcp_p"] = beego.AppConfig.DefaultString("bridge_tcp_show_port", connection.BridgeTcpPort)
+		s.Data["tcp_ip"] = beego.AppConfig.DefaultString("bridge_tcp_show_ip", ip)
+		s.Data["tcp_p"] = beego.AppConfig.DefaultString("bridge_tcp_show_port", strconv.Itoa(connection.BridgeTcpPort))
 	}
 	if beego.AppConfig.DefaultBool("bridge_kcp_show", bridge.ServerKcpEnable) {
-		s.Data["kcp_p"] = beego.AppConfig.DefaultString("bridge_kcp_show_port", connection.BridgeKcpPort)
+		s.Data["kcp_ip"] = beego.AppConfig.DefaultString("bridge_kcp_show_ip", ip)
+		s.Data["kcp_p"] = beego.AppConfig.DefaultString("bridge_kcp_show_port", strconv.Itoa(connection.BridgeKcpPort))
 	}
 	if beego.AppConfig.DefaultBool("bridge_tls_show", bridge.ServerTlsEnable) {
-		s.Data["tls_p"] = beego.AppConfig.DefaultString("bridge_tls_show_port", connection.BridgeTlsPort)
+		s.Data["tls_ip"] = beego.AppConfig.DefaultString("bridge_tls_show_ip", ip)
+		s.Data["tls_p"] = beego.AppConfig.DefaultString("bridge_tls_show_port", strconv.Itoa(connection.BridgeTlsPort))
+	}
+	if beego.AppConfig.DefaultBool("bridge_quic_show", bridge.ServerQuicEnable) {
+		quicIp := beego.AppConfig.DefaultString("bridge_quic_show_ip", ip)
+		quicPort := beego.AppConfig.DefaultString("bridge_quic_show_port", strconv.Itoa(connection.BridgeQuicPort))
+		quicAlpn := beego.AppConfig.DefaultString("bridge_quic_show_alpn", connection.QuicAlpn[0])
+		quicAddr := quicIp + ":" + quicPort
+		if quicAlpn != "" && quicAlpn != "nps" {
+			quicAddr = quicAddr + "/" + quicAlpn
+		}
+		s.Data["quic_ip"] = quicIp
+		s.Data["quic_p"] = quicPort
+		s.Data["quic_alpn"] = quicAlpn
+		s.Data["quic_addr"] = quicAddr
 	}
 	if wsPath := beego.AppConfig.String("bridge_path"); wsPath != "" {
 		s.Data["ws_path"] = beego.AppConfig.DefaultString("bridge_show_path", wsPath)
 		if beego.AppConfig.DefaultBool("bridge_ws_show", bridge.ServerWsEnable) {
+			s.Data["ws_ip"] = beego.AppConfig.DefaultString("bridge_ws_show_ip", ip)
 			s.Data["ws_p"] = beego.AppConfig.DefaultString("bridge_ws_show_port", beego.AppConfig.String("bridge_ws_port"))
 		}
 		if beego.AppConfig.DefaultBool("bridge_wss_show", bridge.ServerWssEnable) {
+			s.Data["wss_ip"] = beego.AppConfig.DefaultString("bridge_wss_show_ip", ip)
 			s.Data["wss_p"] = beego.AppConfig.DefaultString("bridge_wss_show_port", beego.AppConfig.String("bridge_wss_port"))
 		}
 	}
@@ -113,6 +137,7 @@ func (s *BaseController) display(tpl ...string) {
 
 func (s *BaseController) error() {
 	s.Data["web_base_url"] = beego.AppConfig.String("web_base_url")
+	s.Data["head_custom_code"] = template.HTML(beego.AppConfig.String("head_custom_code"))
 	s.Data["version"] = server.GetVersion()
 	s.Data["year"] = server.GetCurrentYear()
 	s.Layout = "public/layout.html"
@@ -239,7 +264,10 @@ func (s *BaseController) CheckUserAuth() {
 }
 
 func GetBestBridge(ip string) (bridgeType, bridgeAddr, bridgeIp, bridgePort string) {
-	bridgeIp = beego.AppConfig.DefaultString("bridge_addr", common.GetIpByAddr(ip))
+	bridgeIp = common.GetIpByAddr(beego.AppConfig.DefaultString("bridge_addr", ip))
+	if strings.IndexByte(bridgeIp, ':') >= 0 && !(strings.HasPrefix(bridgeIp, "[") && strings.HasSuffix(bridgeIp, "]")) {
+		bridgeIp = "[" + bridgeIp + "]"
+	}
 	bridgeType = beego.AppConfig.String("bridge_type")
 	bridgePort = strconv.Itoa(server.Bridge.TunnelPort)
 	bridgeAddr = bridgeIp + ":" + bridgePort
@@ -248,24 +276,38 @@ func GetBestBridge(ip string) (bridgeType, bridgeAddr, bridgeIp, bridgePort stri
 	}
 	if beego.AppConfig.DefaultBool("bridge_tls_show", bridge.ServerTlsEnable) {
 		bridgeType = "tls"
-		bridgePort = beego.AppConfig.DefaultString("bridge_tls_show_port", connection.BridgeTlsPort)
-		bridgeAddr = bridgeIp + ":" + bridgePort
+		bridgePort = beego.AppConfig.DefaultString("bridge_tls_show_port", strconv.Itoa(connection.BridgeTlsPort))
+		bridgeTlsIp := beego.AppConfig.DefaultString("bridge_tls_show_ip", bridgeIp)
+		bridgeAddr = bridgeTlsIp + ":" + bridgePort
+	} else if beego.AppConfig.DefaultBool("bridge_quic_show", bridge.ServerQuicEnable) {
+		bridgeType = "quic"
+		bridgePort = beego.AppConfig.DefaultString("bridge_quic_show_port", strconv.Itoa(connection.BridgeQuicPort))
+		bridgeQuicIp := beego.AppConfig.DefaultString("bridge_quic_show_ip", bridgeIp)
+		bridgeAddr = bridgeQuicIp + ":" + bridgePort
+		quicAlpn := beego.AppConfig.DefaultString("bridge_quic_show_alpn", connection.QuicAlpn[0])
+		if quicAlpn != "" && quicAlpn != "nps" {
+			bridgeAddr = bridgeAddr + "/" + quicAlpn
+		}
 	} else if beego.AppConfig.DefaultBool("bridge_wss_show", bridge.ServerWssEnable) {
 		bridgeType = "wss"
-		bridgePort = beego.AppConfig.DefaultString("bridge_wss_show_port", connection.BridgeWssPort)
-		bridgeAddr = bridgeIp + ":" + bridgePort + beego.AppConfig.DefaultString("bridge_show_path", connection.BridgePath)
+		bridgePort = beego.AppConfig.DefaultString("bridge_wss_show_port", strconv.Itoa(connection.BridgeWssPort))
+		bridgeWssIp := beego.AppConfig.DefaultString("bridge_wss_show_ip", bridgeIp)
+		bridgeAddr = bridgeWssIp + ":" + bridgePort + beego.AppConfig.DefaultString("bridge_show_path", connection.BridgePath)
 	} else if beego.AppConfig.DefaultBool("bridge_tcp_show", bridge.ServerTcpEnable) {
 		bridgeType = "tcp"
-		bridgePort = beego.AppConfig.DefaultString("bridge_tcp_show_port", connection.BridgeTcpPort)
-		bridgeAddr = bridgeIp + ":" + bridgePort
+		bridgePort = beego.AppConfig.DefaultString("bridge_tcp_show_port", strconv.Itoa(connection.BridgeTcpPort))
+		bridgeTcpIp := beego.AppConfig.DefaultString("bridge_tcp_show_ip", bridgeIp)
+		bridgeAddr = bridgeTcpIp + ":" + bridgePort
 	} else if beego.AppConfig.DefaultBool("bridge_kcp_show", bridge.ServerKcpEnable) {
 		bridgeType = "kcp"
-		bridgePort = beego.AppConfig.DefaultString("bridge_kcp_show_port", connection.BridgeKcpPort)
-		bridgeAddr = bridgeIp + ":" + bridgePort
+		bridgePort = beego.AppConfig.DefaultString("bridge_kcp_show_port", strconv.Itoa(connection.BridgeKcpPort))
+		bridgeKcpIp := beego.AppConfig.DefaultString("bridge_kcp_show_ip", bridgeIp)
+		bridgeAddr = bridgeKcpIp + ":" + bridgePort
 	} else if beego.AppConfig.DefaultBool("bridge_ws_show", bridge.ServerWsEnable) {
 		bridgeType = "ws"
-		bridgePort = beego.AppConfig.DefaultString("bridge_ws_show_port", connection.BridgeWsPort)
-		bridgeAddr = bridgeIp + ":" + bridgePort + beego.AppConfig.DefaultString("bridge_show_path", connection.BridgePath)
+		bridgePort = beego.AppConfig.DefaultString("bridge_ws_show_port", strconv.Itoa(connection.BridgeWsPort))
+		bridgeWsIp := beego.AppConfig.DefaultString("bridge_ws_show_ip", bridgeIp)
+		bridgeAddr = bridgeWsIp + ":" + bridgePort + beego.AppConfig.DefaultString("bridge_show_path", connection.BridgePath)
 	}
 	return
 }

@@ -4,7 +4,7 @@ import (
 	"sync"
 )
 
-const PoolSize = 64 * 1024
+const PoolSize = 64 << 10
 const PoolSizeSmall = 100
 const PoolSizeUdp = 1472 + 200
 const PoolSizeCopy = 32 << 10
@@ -65,7 +65,7 @@ type copyBufferPool struct {
 func (Self *copyBufferPool) New() {
 	Self.pool = sync.Pool{
 		New: func() interface{} {
-			return make([]byte, PoolSizeCopy, PoolSizeCopy)
+			return make([]byte, PoolSizeCopy)
 		},
 	}
 }

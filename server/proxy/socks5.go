@@ -6,11 +6,14 @@ import (
 	"io"
 	"net"
 	"strconv"
+	"sync/atomic"
+	"time"
 
 	"github.com/mycoool/nps/lib/common"
 	"github.com/mycoool/nps/lib/conn"
 	"github.com/mycoool/nps/lib/file"
 	"github.com/mycoool/nps/lib/logs"
+	"github.com/mycoool/nps/lib/transport"
 )
 
 const (
@@ -21,9 +24,9 @@ const (
 	bindMethod      = 2
 	associateMethod = 3
 	// The maximum packet size of any udp Associate packet, based on ethernet's max size,
-	// minus the IP and UDP headers. IPv4 has a 20 byte header, UDP adds an
-	// additional 4 bytes.  This is a total overhead of 24 bytes.  Ethernet's
-	// max packet size is 1500 bytes,  1500 - 24 = 1476.
+	// minus the IP and UDP headers. IPv4 has a 20 byte header, UDP adds another 4 bytes.
+	// This is a total overhead of 24 bytes. Ethernet's max packet size is 1500 bytes,
+	// 1500 - 24 = 1476.
 	maxUDPPacketSize = 1476
 )
 
@@ -46,28 +49,23 @@ const (
 	authFailure     = uint8(1)
 )
 
-//type Sock5ModeServer struct {
-//	BaseServer
-//	listener net.Listener
-//}
-
-// req
+// Handle the SOCKS5 request after method selection.
+// Expected header:
+// +----+-----+-------+------+----------+----------+
+// |VER | CMD |  RSV  | ATYP | DST.ADDR | DST.PORT |
+// +----+-----+-------+------+----------+----------+
 func (s *TunnelModeServer) handleSocks5Request(c net.Conn) {
-	/*
-		The SOCKS request is formed as follows:
-		+----+-----+-------+------+----------+----------+
-		|VER | CMD |  RSV  | ATYP | DST.ADDR | DST.PORT |
-		+----+-----+-------+------+----------+----------+
-		| 1  |  1  | X'00' |  1   | Variable |    2     |
-		+----+-----+-------+------+----------+----------+
-	*/
 	header := make([]byte, 3)
-
-	_, err := io.ReadFull(c, header)
-
-	if err != nil {
-		logs.Warn("illegal request %v", err)
-		c.Close()
+	if _, err := io.ReadFull(c, header); err != nil {
+		logs.Warn("illegal request (head) %v", err)
+		_ = c.Close()
+		return
+	}
+	// Strict check: VER==5, RSV==0
+	if header[0] != 5 || header[2] != 0 {
+		logs.Warn("illegal request ver/rsv: ver=%d rsv=%d", header[0], header[2])
+		s.sendReply(c, commandNotSupported)
+		_ = c.Close()
 		return
 	}
 
@@ -80,53 +78,74 @@ func (s *TunnelModeServer) handleSocks5Request(c net.Conn) {
 		s.handleUDP(c)
 	default:
 		s.sendReply(c, commandNotSupported)
-		c.Close()
+		_ = c.Close()
 	}
 }
 
-// reply
+// Send a standard SOCKS5 reply using c.LocalAddr as BND.ADDR/BND.PORT.
 func (s *TunnelModeServer) sendReply(c net.Conn, rep uint8) {
-	reply := []byte{
-		5,
-		rep,
-		0,
-		1,
-	}
-
 	localAddr := c.LocalAddr().String()
 	localHost, localPort, _ := net.SplitHostPort(localAddr)
-	ipBytes := net.ParseIP(localHost).To4()
-	if ipBytes == nil {
-		ipBytes = net.ParseIP("127.0.0.1").To4()
+	ip := net.ParseIP(localHost)
+
+	var atype byte
+	var addrBytes []byte
+	if v4 := ip.To4(); v4 != nil {
+		atype = ipV4
+		addrBytes = v4
+	} else if v6 := ip.To16(); v6 != nil {
+		atype = ipV6
+		addrBytes = v6
+	} else {
+		atype = ipV4
+		addrBytes = net.IPv4(127, 0, 0, 1).To4()
 	}
+
 	nPort, _ := strconv.Atoi(localPort)
-	reply = append(reply, ipBytes...)
 	portBytes := make([]byte, 2)
 	binary.BigEndian.PutUint16(portBytes, uint16(nPort))
-	reply = append(reply, portBytes...)
 
-	c.Write(reply)
+	// VER, REP, RSV, ATYP, BND.ADDR, BND.PORT
+	reply := []byte{5, rep, 0, atype}
+	reply = append(reply, addrBytes...)
+	reply = append(reply, portBytes...)
+	_, _ = c.Write(reply)
 }
 
-// do conn
-func (s *TunnelModeServer) doConnect(c net.Conn, command uint8) {
+// CONNECT command handler: parse target and bridge TCP through DealClient.
+func (s *TunnelModeServer) handleConnect(c net.Conn) {
 	addrType := make([]byte, 1)
-	c.Read(addrType)
+	if _, err := io.ReadFull(c, addrType); err != nil {
+		s.sendReply(c, addrTypeNotSupported)
+		return
+	}
 	var host string
 	switch addrType[0] {
 	case ipV4:
 		ipv4 := make(net.IP, net.IPv4len)
-		c.Read(ipv4)
+		if _, err := io.ReadFull(c, ipv4); err != nil {
+			s.sendReply(c, addrTypeNotSupported)
+			return
+		}
 		host = ipv4.String()
 	case ipV6:
 		ipv6 := make(net.IP, net.IPv6len)
-		c.Read(ipv6)
+		if _, err := io.ReadFull(c, ipv6); err != nil {
+			s.sendReply(c, addrTypeNotSupported)
+			return
+		}
 		host = ipv6.String()
 	case domainName:
 		var domainLen uint8
-		binary.Read(c, binary.BigEndian, &domainLen)
+		if err := binary.Read(c, binary.BigEndian, &domainLen); err != nil || domainLen == 0 {
+			s.sendReply(c, addrTypeNotSupported)
+			return
+		}
 		domain := make([]byte, domainLen)
-		c.Read(domain)
+		if _, err := io.ReadFull(c, domain); err != nil {
+			s.sendReply(c, addrTypeNotSupported)
+			return
+		}
 		host = string(domain)
 	default:
 		s.sendReply(c, addrTypeNotSupported)
@@ -134,159 +153,261 @@ func (s *TunnelModeServer) doConnect(c net.Conn, command uint8) {
 	}
 
 	var port uint16
-	binary.Read(c, binary.BigEndian, &port)
-	// connect to host
+	if err := binary.Read(c, binary.BigEndian, &port); err != nil {
+		s.sendReply(c, addrTypeNotSupported)
+		return
+	}
+
 	addr := net.JoinHostPort(host, strconv.Itoa(int(port)))
-	var ltype string
-	if command == associateMethod {
-		ltype = common.CONN_UDP
-	} else {
-		ltype = common.CONN_TCP
-	}
-	s.DealClient(conn.NewConn(c), s.task.Client, addr, nil, ltype, func() {
+
+	_ = s.DealClient(conn.NewConn(c), s.Task.Client, addr, nil, common.CONN_TCP, func() {
 		s.sendReply(c, succeeded)
-	}, []*file.Flow{s.task.Flow, s.task.Client.Flow}, s.task.Target.ProxyProtocol, s.task.Target.LocalProxy, s.task)
-	return
+	}, []*file.Flow{s.Task.Flow, s.Task.Client.Flow}, 0, s.Task.Target.LocalProxy, s.Task)
 }
 
-// conn
-func (s *TunnelModeServer) handleConnect(c net.Conn) {
-	s.doConnect(c, connectMethod)
-}
-
-// passive mode
+// BIND is not supported.
 func (s *TunnelModeServer) handleBind(c net.Conn) {
+	s.sendReply(c, commandNotSupported)
+	_ = c.Close()
 }
-func (s *TunnelModeServer) sendUdpReply(writeConn net.Conn, c net.Conn, rep uint8, serverIp string) {
-	reply := []byte{
-		5,
-		rep,
-		0,
-		1,
-	}
-	localHost, localPort, _ := net.SplitHostPort(c.LocalAddr().String())
-	localHost = serverIp
-	ipBytes := net.ParseIP(localHost).To4()
-	nPort, _ := strconv.Atoi(localPort)
-	reply = append(reply, ipBytes...)
-	portBytes := make([]byte, 2)
-	binary.BigEndian.PutUint16(portBytes, uint16(nPort))
-	reply = append(reply, portBytes...)
-	writeConn.Write(reply)
 
+// Compose UDP associate reply. Prefer the actual UDP bound IP, then TCP local IP,
+func (s *TunnelModeServer) sendUdpReply(writeConn net.Conn, replyUDP *net.UDPConn, rep uint8, clientIP net.IP) {
+	wantV6 := clientIP != nil && clientIP.To4() == nil
+
+	var ipToUse net.IP
+	var tcpLocalIP net.IP
+	var udpLocalIP net.IP
+
+	if ta, ok := writeConn.LocalAddr().(*net.TCPAddr); ok && ta != nil && ta.IP != nil {
+		tcpLocalIP = ta.IP
+	}
+	if ua, ok := replyUDP.LocalAddr().(*net.UDPAddr); ok && ua != nil && ua.IP != nil {
+		udpLocalIP = ua.IP
+	}
+
+	// 1) Prefer UDP bound IP if it's specific and matches family.
+	if udpLocalIP != nil && !udpLocalIP.IsUnspecified() && !common.IsZeroIP(udpLocalIP) {
+		if (udpLocalIP.To4() == nil) == wantV6 {
+			ipToUse = udpLocalIP
+		}
+	}
+	// 2) Fallback to TCP local IP if family matches.
+	if ipToUse == nil && tcpLocalIP != nil && !tcpLocalIP.IsUnspecified() && !common.IsZeroIP(tcpLocalIP) {
+		if (tcpLocalIP.To4() == nil) == wantV6 {
+			ipToUse = tcpLocalIP
+		}
+	}
+	// 3) Final fallback to loopback
+	if ipToUse == nil {
+		if wantV6 {
+			ipToUse = net.IPv6loopback
+		} else {
+			ipToUse = net.IPv4(127, 0, 0, 1)
+		}
+	}
+
+	var atype byte
+	var addrBytes []byte
+	if v4 := ipToUse.To4(); v4 != nil {
+		atype = ipV4
+		addrBytes = v4
+	} else {
+		atype = ipV6
+		addrBytes = ipToUse.To16()
+	}
+
+	la := replyUDP.LocalAddr().(*net.UDPAddr)
+	portBytes := make([]byte, 2)
+	binary.BigEndian.PutUint16(portBytes, uint16(la.Port))
+
+	logs.Debug("send udp reply: chosen=%v atype=%d bndPort=%d wantV6=%v tcpLocal=%v udpLocal=%v clientIP=%v",
+		ipToUse, atype, la.Port, wantV6, writeConn.LocalAddr(), replyUDP.LocalAddr(), clientIP)
+
+	// VER, REP, RSV, ATYP, BND.ADDR, BND.PORT
+	reply := []byte{5, rep, 0, atype}
+	reply = append(reply, addrBytes...)
+	reply = append(reply, portBytes...)
+	_, _ = writeConn.Write(reply)
 }
 
 func (s *TunnelModeServer) handleUDP(c net.Conn) {
+	if tcpConn, ok := c.(*net.TCPConn); ok {
+		_ = tcpConn.SetKeepAlive(true)
+		_ = tcpConn.SetKeepAlivePeriod(15 * time.Second)
+		_ = transport.SetTcpKeepAliveParams(tcpConn, 15, 15, 3)
+	}
 	defer c.Close()
+
 	addrType := make([]byte, 1)
-	c.Read(addrType)
+	if _, err := io.ReadFull(c, addrType); err != nil {
+		s.sendReply(c, addrTypeNotSupported)
+		return
+	}
 	var host string
 	switch addrType[0] {
 	case ipV4:
 		ipv4 := make(net.IP, net.IPv4len)
-		c.Read(ipv4)
+		if _, err := io.ReadFull(c, ipv4); err != nil {
+			s.sendReply(c, addrTypeNotSupported)
+			return
+		}
 		host = ipv4.String()
 	case ipV6:
 		ipv6 := make(net.IP, net.IPv6len)
-		c.Read(ipv6)
+		if _, err := io.ReadFull(c, ipv6); err != nil {
+			s.sendReply(c, addrTypeNotSupported)
+			return
+		}
 		host = ipv6.String()
 	case domainName:
 		var domainLen uint8
-		binary.Read(c, binary.BigEndian, &domainLen)
+		if err := binary.Read(c, binary.BigEndian, &domainLen); err != nil || domainLen == 0 {
+			s.sendReply(c, addrTypeNotSupported)
+			return
+		}
 		domain := make([]byte, domainLen)
-		c.Read(domain)
+		if _, err := io.ReadFull(c, domain); err != nil {
+			s.sendReply(c, addrTypeNotSupported)
+			return
+		}
 		host = string(domain)
 	default:
 		s.sendReply(c, addrTypeNotSupported)
 		return
 	}
-	//读取端口
 	var port uint16
-	binary.Read(c, binary.BigEndian, &port)
-	logs.Trace("%s %d", host, port)
-	replyAddr, err := net.ResolveUDPAddr("udp", s.task.ServerIp+":0")
-	if err != nil {
-		logs.Error("build local reply addr error %v", err)
+	if err := binary.Read(c, binary.BigEndian, &port); err != nil {
+		s.sendReply(c, addrTypeNotSupported)
 		return
 	}
-	reply, err := net.ListenUDP("udp", replyAddr)
+	logs.Trace("ASSOCIATE %s:%d", host, port)
+
+	// Bind a UDP socket. Try to match client's address family where possible.
+	var clientIP net.IP
+	if ta, ok := c.RemoteAddr().(*net.TCPAddr); ok && ta != nil {
+		clientIP = ta.IP
+	}
+	network, localAddr := common.BuildUdpBindAddr(s.Task.ServerIp, clientIP)
+	logs.Trace("listen local reply udp port (network=%s, localAddr=%v)", network, localAddr)
+	reply, err := net.ListenUDP(network, localAddr)
 	if err != nil {
 		s.sendReply(c, addrTypeNotSupported)
-		logs.Error("listen local reply udp port error")
+		logs.Error("listen local reply udp port error: %v (network=%s, localAddr=%v)", err, network, localAddr)
 		return
 	}
-	// reply the local addr
-	s.sendUdpReply(c, reply, succeeded, common.GetServerIpByClientIp(c.RemoteAddr().(*net.TCPAddr).IP))
 	defer reply.Close()
-	// new a tunnel to client
-	link := conn.NewLink("udp5", "", s.task.Client.Cnf.Crypt, s.task.Client.Cnf.Compress, c.RemoteAddr().String(), s.allowLocalProxy && s.task.Target.LocalProxy)
-	target, err := s.bridge.SendLinkInfo(s.task.Client.Id, link, s.task)
+
+	// Reply BND.ADDR/PORT to client.
+	s.sendUdpReply(c, reply, succeeded, clientIP)
+
+	// Create a tunnel link to npc; pass SOCKS5 UDP frames as-is.
+	link := conn.NewLink("udp5", "", s.Task.Client.Cnf.Crypt, s.Task.Client.Cnf.Compress, c.RemoteAddr().String(), s.AllowLocalProxy && s.Task.Target.LocalProxy)
+	link.Option.Timeout = 180 * time.Second
+
+	target, err := s.Bridge.SendLinkInfo(s.Task.Client.Id, link, s.Task)
 	if err != nil {
-		logs.Warn("get connection from client id %d  error %v", s.task.Client.Id, err)
+		logs.Warn("get connection from client Id %d error: %v", s.Task.Client.Id, err)
 		return
 	}
+	defer target.Close()
 
-	var clientAddr net.Addr
-	// copy buffer
+	timeoutConn := conn.NewTimeoutConn(target, link.Option.Timeout)
+	defer timeoutConn.Close()
+	flowConn := conn.NewFlowConn(timeoutConn, s.Task.Flow, s.Task.Client.Flow)
+	framed := conn.WrapFramed(flowConn)
+
+	// First-UDP IP locking: set on first datagram we receive, then only accept same IP.
+	var firstUDPIP net.IP
+	var clientAddr atomic.Pointer[net.UDPAddr]
+
+	// Local UDP -> tunnel
 	go func() {
-		b := common.BufPoolUdp.Get().([]byte)
-		defer common.BufPoolUdp.Put(b)
-		defer c.Close()
+		b := common.BufPoolMax.Get().([]byte)
+		defer common.PutBufPoolMax(b)
 
 		for {
-			n, laddr, err := reply.ReadFrom(b)
+			n, lAddr, err := reply.ReadFromUDP(b)
 			if err != nil {
 				logs.Debug("read data from %v err %v", reply.LocalAddr(), err)
+				_ = c.Close()
+				_ = flowConn.Close()
 				return
 			}
-			if clientAddr == nil {
-				clientAddr = laddr
+
+			// Lock to the first UDP source IP (allow port changes).
+			normIP := common.NormalizeIP(lAddr.IP)
+			if firstUDPIP == nil {
+				firstUDPIP = normIP
+				logs.Debug("lock UDP source ip to %v", firstUDPIP)
 			}
-			if _, err := target.Write(b[:n]); err != nil {
-				logs.Debug("write data to client error %v", err)
+			if !normIP.Equal(firstUDPIP) {
+				logs.Debug("ignore udp from unexpected ip: %v (locked to %v)", lAddr.IP, firstUDPIP)
+				continue
+			}
+			// Update the return address to the latest (port may change).
+			clientAddr.Store(lAddr)
+
+			// SOCKS5 UDP: FRAG must be 0 (we don't support fragmentation).
+			if n >= 3 && b[2] != 0 {
+				logs.Warn("socks5 udp frag not supported, drop (frag=%d)", b[2])
+				continue
+			}
+			// Size guard vs framed link.
+			if n > conn.MaxFramePayload {
+				logs.Debug("udp datagram too large: %d > %d (drop)", n, conn.MaxFramePayload)
+				continue
+			}
+			if _, err := framed.Write(b[:n]); err != nil {
+				logs.Debug("write udp frame to tunnel error %v", err)
+				_ = c.Close()
+				_ = flowConn.Close()
 				return
 			}
 		}
 	}()
 
+	// Tunnel -> local UDP
 	go func() {
-		var l int32
-		b := common.BufPoolUdp.Get().([]byte)
-		defer common.BufPoolUdp.Put(b)
-		defer c.Close()
+		b := common.BufPoolMax.Get().([]byte)
+		defer common.PutBufPoolMax(b)
+
 		for {
-			if err := binary.Read(target, binary.LittleEndian, &l); err != nil || l >= common.PoolSizeUdp || l <= 0 {
-				logs.Debug("read len bytes error %v", err)
+			n, err := framed.Read(b)
+			if err != nil || n <= 0 || n > len(b) {
+				logs.Debug("read udp frame from tunnel error %v", err)
+				_ = c.Close()
+				_ = flowConn.Close()
 				return
 			}
-			binary.Read(target, binary.LittleEndian, b[:l])
-			if err != nil {
-				logs.Warn("read data form client error %v", err)
-				return
-			}
-			if _, err := reply.WriteTo(b[:l], clientAddr); err != nil {
-				logs.Warn("write data to user %v", err)
-				return
+			if addr := clientAddr.Load(); addr != nil {
+				if _, err := reply.WriteTo(b[:n], addr); err != nil {
+					logs.Warn("write data to user %v", err)
+					_ = c.Close()
+					_ = flowConn.Close()
+					return
+				}
+			} else {
+				// Haven't seen a valid client UDP address yet; drop.
+				logs.Debug("no client udp addr yet, drop %d bytes", n)
 			}
 		}
 	}()
 
-	b := common.BufPoolUdp.Get().([]byte)
-	defer common.BufPoolUdp.Put(b)
-	defer target.Close()
+	// Keep TCP control connection alive until client closes it.
+	b := common.BufPoolMax.Get().([]byte)
+	defer common.PutBufPoolMax(b)
 	for {
-		_, err := c.Read(b)
-		if err != nil {
-			c.Close()
+		if _, err := c.Read(b); err != nil {
+			_ = flowConn.Close()
 			return
 		}
 	}
 }
 
-// socks5 auth
-func (s *TunnelModeServer) Auth(c net.Conn) error {
+func (s *TunnelModeServer) SocksAuth(c net.Conn) error {
 	header := []byte{0, 0}
-	if _, err := io.ReadAtLeast(c, header, 2); err != nil {
+	if _, err := io.ReadFull(c, header); err != nil {
 		return err
 	}
 	if header[0] != userAuthVersion {
@@ -294,19 +415,19 @@ func (s *TunnelModeServer) Auth(c net.Conn) error {
 	}
 	userLen := int(header[1])
 	user := make([]byte, userLen)
-	if _, err := io.ReadAtLeast(c, user, userLen); err != nil {
+	if _, err := io.ReadFull(c, user); err != nil {
 		return err
 	}
-	if _, err := c.Read(header[:1]); err != nil {
+	if _, err := io.ReadFull(c, header[:1]); err != nil {
 		return errors.New("failed to read password length")
 	}
 	passLen := int(header[0])
 	pass := make([]byte, passLen)
-	if _, err := io.ReadAtLeast(c, pass, passLen); err != nil {
+	if _, err := io.ReadFull(c, pass); err != nil {
 		return err
 	}
 
-	if common.CheckAuthWithAccountMap(string(user), string(pass), s.task.Client.Cnf.U, s.task.Client.Cnf.P, file.GetAccountMap(s.task.MultiAccount), file.GetAccountMap(s.task.UserAuth)) {
+	if common.CheckAuthWithAccountMap(string(user), string(pass), s.Task.Client.Cnf.U, s.Task.Client.Cnf.P, file.GetAccountMap(s.Task.MultiAccount), file.GetAccountMap(s.Task.UserAuth)) {
 		if _, err := c.Write([]byte{userAuthVersion, authSuccess}); err != nil {
 			return err
 		}
@@ -320,21 +441,21 @@ func (s *TunnelModeServer) Auth(c net.Conn) error {
 }
 
 func ProcessMix(c *conn.Conn, s *TunnelModeServer) error {
-	switch s.task.Mode {
+	switch s.Task.Mode {
 	case "socks5":
-		s.task.Mode = "mixProxy"
-		s.task.HttpProxy = false
-		s.task.Socks5Proxy = true
+		s.Task.Mode = "mixProxy"
+		s.Task.HttpProxy = false
+		s.Task.Socks5Proxy = true
 	case "httpProxy":
-		s.task.Mode = "mixProxy"
-		s.task.HttpProxy = true
-		s.task.Socks5Proxy = false
+		s.Task.Mode = "mixProxy"
+		s.Task.HttpProxy = true
+		s.Task.Socks5Proxy = false
 	}
 
 	buf := make([]byte, 2)
 	if _, err := io.ReadFull(c, buf); err != nil {
 		logs.Warn("negotiation err %v", err)
-		c.Close()
+		_ = c.Close()
 		return err
 	}
 
@@ -342,83 +463,70 @@ func ProcessMix(c *conn.Conn, s *TunnelModeServer) error {
 		method := string(buf)
 		switch method {
 		case "GE", "PO", "HE", "PU ", "DE", "OP", "CO", "TR", "PA", "PR", "MK", "MO", "LO", "UN", "RE", "AC", "SE", "LI":
-			if !s.task.HttpProxy {
-				logs.Warn("http proxy is disable, client %d request from: %v", s.task.Client.Id, c.RemoteAddr())
-				c.Close()
+			if !s.Task.HttpProxy {
+				logs.Warn("http proxy is disable, client %d request from: %v", s.Task.Client.Id, c.RemoteAddr())
+				_ = c.Close()
 				return errors.New("http proxy is disabled")
 			}
-			nConn := conn.NewConn(c)
-			nConn.Rb = buf
-			ss := NewTunnelModeServer(ProcessHttp, s.bridge, s.task)
-			if err := ProcessHttp(nConn, ss); err != nil {
+			if err := ProcessHttp(c.SetRb(buf), s); err != nil {
 				logs.Warn("http proxy error: %v", err)
+				_ = c.Close()
 				return err
 			}
-			c.Close()
+			_ = c.Close()
 			return nil
 		}
 		logs.Trace("Socks5 Buf: %s", buf)
 		logs.Warn("only support socks5 and http, request from: %v", c.RemoteAddr())
-		c.Close()
+		_ = c.Close()
 		return errors.New("unknown protocol")
 	}
 
-	if !s.task.Socks5Proxy {
-		logs.Warn("socks5 proxy is disable, client %d request from: %v", s.task.Client.Id, c.RemoteAddr())
-		c.Close()
+	if !s.Task.Socks5Proxy {
+		logs.Warn("socks5 proxy is disable, client %d request from: %v", s.Task.Client.Id, c.RemoteAddr())
+		_ = c.Close()
 		return errors.New("socks5 proxy is disabled")
 	}
 
 	nMethods := buf[1]
 	methods := make([]byte, nMethods)
-	if len, err := c.Read(methods); len != int(nMethods) || err != nil {
+	if _, err := io.ReadFull(c, methods); err != nil {
 		logs.Warn("wrong method")
-		c.Close()
+		_ = c.Close()
 		return errors.New("wrong method")
 	}
-	if (s.task.Client.Cnf.U != "" && s.task.Client.Cnf.P != "") || (s.task.MultiAccount != nil && len(s.task.MultiAccount.AccountMap) > 0) || (s.task.UserAuth != nil && len(s.task.UserAuth.AccountMap) > 0) {
-		buf[1] = UserPassAuth
-		c.Write(buf)
-		if err := s.Auth(c); err != nil {
-			c.Close()
+	supports := func(m byte) bool {
+		for _, x := range methods {
+			if x == m {
+				return true
+			}
+		}
+		return false
+	}
+	needAuth := (s.Task.Client.Cnf.U != "" && s.Task.Client.Cnf.P != "") ||
+		(s.Task.MultiAccount != nil && len(s.Task.MultiAccount.AccountMap) > 0) ||
+		(s.Task.UserAuth != nil && len(s.Task.UserAuth.AccountMap) > 0)
+
+	if needAuth {
+		if !supports(UserPassAuth) {
+			_, _ = c.Write([]byte{5, 0xFF})
+			_ = c.Close()
+			return errors.New("no acceptable authentication method")
+		}
+		_, _ = c.Write([]byte{5, UserPassAuth})
+		if err := s.SocksAuth(c); err != nil {
+			_ = c.Close()
 			logs.Warn("Validation failed: %v", err)
 			return err
 		}
 	} else {
-		buf[1] = 0
-		c.Write(buf)
+		if !supports(0x00) {
+			_, _ = c.Write([]byte{5, 0xFF})
+			_ = c.Close()
+			return errors.New("no acceptable method (no-auth not offered)")
+		}
+		_, _ = c.Write([]byte{5, 0x00})
 	}
 	s.handleSocks5Request(c)
 	return nil
 }
-
-/*
-// start
-func (s *TunnelModeServer) Start() error {
-	return conn.NewTcpListenerAndProcess(common.BuildAddress(s.task.ServerIp, strconv.Itoa(s.task.Port)), func(c net.Conn) {
-		if err := s.CheckFlowAndConnNum(s.task.Client); err != nil {
-			logs.Warn("client id %d, task id %d, error %v, when socks5 connection", s.task.Client.Id, s.task.Id, err)
-			c.Close()
-			return
-		}
-		logs.Trace("New proxy (socks5/http) connection,client %d,remote address %v", s.task.Client.Id, c.RemoteAddr())
-		s.handleConn(c)
-		s.task.Client.CutConn()
-	}, &s.listener)
-}
-
-// new
-func NewSock5ModeServer(bridge NetBridge, task *file.Tunnel) *TunnelModeServer {
-	allowLocalProxy, _ := beego.AppConfig.Bool("allow_local_proxy")
-	s := new(Sock5ModeServer)
-	s.bridge = bridge
-	s.task = task
-	s.allowLocalProxy = allowLocalProxy
-	return s
-}
-
-// close
-func (s *TunnelModeServer) Close() error {
-	return s.listener.Close()
-}
-*/

@@ -1,12 +1,9 @@
 package client
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"errors"
 	"net"
-	"net/http"
 	"strconv"
 	"strings"
 	"sync"
@@ -17,7 +14,8 @@ import (
 	"github.com/mycoool/nps/lib/conn"
 	"github.com/mycoool/nps/lib/crypt"
 	"github.com/mycoool/nps/lib/logs"
-	"github.com/mycoool/nps/lib/nps_mux"
+	"github.com/mycoool/nps/lib/mux"
+	"github.com/quic-go/quic-go"
 	"github.com/xtaci/kcp-go/v5"
 )
 
@@ -26,9 +24,10 @@ type TRPClient struct {
 	bridgeConnType string
 	proxyUrl       string
 	vKey           string
-	p2pAddr        map[string]string
-	tunnel         *nps_mux.Mux
+	uuid           string
+	tunnel         any
 	signal         *conn.Conn
+	fsm            *FileServerManager
 	ticker         *time.Ticker
 	cnf            *config.Config
 	disconnectTime int
@@ -38,16 +37,17 @@ type TRPClient struct {
 	once           sync.Once
 }
 
-// new client
-func NewRPClient(svraddr string, vKey string, bridgeConnType string, proxyUrl string, cnf *config.Config, disconnectTime int) *TRPClient {
+// NewRPClient new client
+func NewRPClient(svrAddr, vKey, bridgeConnType, proxyUrl, uuid string, cnf *config.Config, disconnectTime int, fsm *FileServerManager) *TRPClient {
 	return &TRPClient{
-		svrAddr:        svraddr,
-		p2pAddr:        make(map[string]string, 0),
+		svrAddr:        svrAddr,
 		vKey:           vKey,
 		bridgeConnType: bridgeConnType,
 		proxyUrl:       proxyUrl,
+		uuid:           uuid,
 		cnf:            cnf,
 		disconnectTime: disconnectTime,
+		fsm:            fsm,
 		once:           sync.Once{},
 	}
 }
@@ -55,21 +55,77 @@ func NewRPClient(svraddr string, vKey string, bridgeConnType string, proxyUrl st
 var NowStatus int
 var HasFailed = false
 
-// start
-func (s *TRPClient) Start() {
-	s.ctx, s.cancel = context.WithCancel(context.Background())
+func (s *TRPClient) Start(ctx context.Context) {
+	s.ctx, s.cancel = context.WithCancel(ctx)
 	defer s.Close()
 	NowStatus = 0
-	c, err := NewConn(s.bridgeConnType, s.vKey, s.svrAddr, common.WORK_MAIN, s.proxyUrl)
-	if err != nil {
-		HasFailed = true
-		logs.Error("The connection server failed and will be reconnected in five seconds, error %v", err)
-		return
+	if Ver < 5 {
+		c, uuid, err := NewConn(s.bridgeConnType, s.vKey, s.svrAddr, s.proxyUrl)
+		if err != nil {
+			HasFailed = true
+			logs.Error("The connection server failed and will be reconnected in five seconds, error %v", err)
+			return
+		}
+		if s.uuid == "" {
+			s.uuid = uuid
+		}
+		err = SendType(c, common.WORK_MAIN, s.uuid)
+		if err != nil {
+			HasFailed = true
+			logs.Error("The connection server failed and will be reconnected in five seconds, error %v", err)
+			_ = c.Close()
+			return
+		}
+		logs.Info("Successful connection with server %s", s.svrAddr)
+		s.signal = c
 	}
-	logs.Info("Successful connection with server %s", s.svrAddr)
-	s.signal = c
 	//start a channel connection
-	go s.newChan()
+	s.newChan()
+	if Ver > 4 {
+		//c, err = NewConn(s.bridgeConnType, s.vKey, s.svrAddr, common.WORK_MAIN, s.proxyUrl)
+		if s.tunnel == nil {
+			logs.Error("The tunnel is not connected")
+			return
+		}
+		switch t := s.tunnel.(type) {
+		case *mux.Mux:
+			mc, err := t.NewConn()
+			if err != nil {
+				logs.Error("Failed to get new connection, possible version mismatch: %v", err)
+				s.Close()
+				return
+			}
+			mc.SetPriority()
+			c := conn.NewConn(mc)
+			err = SendType(c, common.WORK_MAIN, s.uuid)
+			if err != nil {
+				logs.Error("The connection server failed and will be reconnected in five seconds, error %v", err)
+				_ = mc.Close()
+				return
+			}
+			s.signal = c
+		case *quic.Conn:
+			stream, err := t.OpenStreamSync(s.ctx)
+			if err != nil {
+				logs.Error("Quic OpenStreamSync failed, retrying: %v", err)
+				s.Close()
+				return
+			}
+			sc := conn.NewQuicAutoCloseConn(stream, t)
+			c := conn.NewConn(sc)
+			err = SendType(c, common.WORK_MAIN, s.uuid)
+			if err != nil {
+				logs.Error("The connection server failed and will be reconnected in five seconds, error %v", err)
+				_ = sc.Close()
+				return
+			}
+			s.signal = c
+		default:
+			logs.Error("Unsupported tunnel type: %v", t)
+			return
+		}
+		logs.Info("Successful connection with server %s", s.svrAddr)
+	}
 	//monitor the connection
 	go s.ping()
 	//start health check if it's open
@@ -84,6 +140,7 @@ func (s *TRPClient) Start() {
 
 // handle main connection
 func (s *TRPClient) handleMain() {
+	defer s.Close()
 	for {
 		select {
 		case <-s.ctx.Done():
@@ -108,232 +165,276 @@ func (s *TRPClient) handleMain() {
 					rAddr = common.BuildAddress(remoteIP.String(), strconv.Itoa(common.GetPortByAddr(rAddr)))
 				}
 				var localAddr string
-				//The local port remains unchanged for a certain period of time
-				if v, ok := s.p2pAddr[crypt.Md5(string(pwd)+strconv.Itoa(int(time.Now().Unix()/100)))]; !ok {
-					if strings.Contains(rAddr, "]:") {
-						tmpConn, err := common.GetLocalUdp6Addr()
-						if err != nil {
-							logs.Error("%v", err)
-							return
-						}
-						localAddr = tmpConn.LocalAddr().String()
-					} else {
-						tmpConn, err := common.GetLocalUdp4Addr()
-						if err != nil {
-							logs.Error("%v", err)
-							return
-						}
-						localAddr = tmpConn.LocalAddr().String()
+				if strings.Contains(rAddr, "]:") {
+					tmpConn, err := common.GetLocalUdp6Addr()
+					if err != nil {
+						logs.Error("%v", err)
+						return
 					}
+					localAddr = tmpConn.LocalAddr().String()
 				} else {
-					localAddr = v
+					tmpConn, err := common.GetLocalUdp4Addr()
+					if err != nil {
+						logs.Error("%v", err)
+						return
+					}
+					localAddr = tmpConn.LocalAddr().String()
 				}
-				go s.newUdpConn(localAddr, rAddr, string(pwd))
+				if !DisableP2P {
+					go s.newUdpConn(localAddr, rAddr, string(pwd))
+				}
 			}
 		}
 	}
-	s.Close()
 }
 
 func (s *TRPClient) newUdpConn(localAddr, rAddr string, md5Password string) {
 	var localConn net.PacketConn
 	var err error
-	var remoteAddress string
+	var remoteAddress, role, mode, data string
+	sendData := string(crypt.GetHMAC(s.vKey, crypt.GetCert().Certificate[0]))
 	//logs.Debug("newUdpConn %s %s", localAddr, rAddr)
-	if remoteAddress, localConn, err = handleP2PUdp(s.ctx, localAddr, rAddr, md5Password, common.WORK_P2P_PROVIDER); err != nil {
-		logs.Error("%v", err)
+	if localConn, remoteAddress, localAddr, role, mode, data, err = handleP2PUdp(s.ctx, localAddr, rAddr, md5Password, common.WORK_P2P_PROVIDER, P2PMode, sendData); err != nil {
+		logs.Error("handle P2P error: %v", err)
 		return
 	}
 	defer localConn.Close()
-	l, err := kcp.ServeConn(nil, 150, 3, localConn)
-	if err != nil {
-		logs.Error("%v", err)
-		return
+	if mode == "" || mode != P2PMode {
+		mode = common.CONN_KCP
 	}
-	defer l.Close()
-	logs.Trace("start local p2p udp listen, local address %v", localConn.LocalAddr())
+	wait := time.Duration(s.disconnectTime) * time.Second
+	if wait <= 0 {
+		wait = 30 * time.Second
+	}
+	ctx, cancel := context.WithCancel(s.ctx)
+	defer cancel()
+	timer := time.AfterFunc(wait, func() {
+		cancel()
+	})
+	defer timer.Stop()
+	var kcpListener *kcp.Listener
+	var quicListener *quic.Listener
+
+	var preConnDone chan struct{}
+	var preConnDoneOnce sync.Once
+	done := func() {
+		preConnDoneOnce.Do(func() {
+			if preConnDone != nil {
+				close(preConnDone)
+			}
+		})
+	}
+
+	if mode == common.CONN_QUIC {
+		quicListener, err = quic.Listen(localConn, crypt.GetCertCfg(), QuicConfig)
+		if err != nil {
+			logs.Error("quic.Listen err: %v", err)
+			return
+		}
+		defer quicListener.Close()
+	} else {
+		kcpListener, err = kcp.ServeConn(nil, 150, 3, localConn)
+		if err != nil {
+			logs.Error("kcp.ServeConn err: %v", err)
+			return
+		}
+		defer kcpListener.Close()
+		preConnDone = make(chan struct{})
+		go func() {
+			select {
+			case <-ctx.Done():
+				_ = kcpListener.Close()
+			case <-preConnDone:
+				return
+			}
+		}()
+		defer done()
+	}
+
+	logs.Trace("start local p2p udp[%s] listen, role[%s], local address %s %v", mode, role, localAddr, localConn.LocalAddr())
+	if data != "" {
+		logs.Trace("P2P udp data is %s", data)
+	}
 	for {
 		select {
-		case <-s.ctx.Done():
+		case <-ctx.Done():
 			return
 		default:
 		}
-		udpTunnel, err := l.AcceptKCP()
-		if err != nil {
-			logs.Error("acceptKCP failed on listener %v waiting for remote %s: %v", localConn.LocalAddr(), remoteAddress, err)
-			return
-		}
-		if udpTunnel.RemoteAddr().String() == string(remoteAddress) {
+		switch mode {
+		case common.CONN_QUIC:
+			sess, err := quicListener.Accept(ctx)
+			if err != nil {
+				logs.Warn("QUIC accept session error: %v", err)
+				return
+			}
+			if sess.RemoteAddr().String() != remoteAddress {
+				_ = sess.CloseWithError(0, "unexpected peer")
+				continue
+			}
+			if !timer.Stop() {
+				logs.Warn("QUIC pre-connection timer already fired")
+				_ = sess.CloseWithError(0, "timer already fired")
+				return
+			}
+			for {
+				stream, err := sess.AcceptStream(ctx)
+				if err != nil {
+					logs.Trace("QUIC accept stream error: %v", err)
+					_ = sess.CloseWithError(0, "accept stream error")
+					return
+				}
+				c := conn.NewQuicStreamConn(stream, sess)
+				go s.handleChan(c)
+			}
+		default: // KCP
+			udpTunnel, err := kcpListener.AcceptKCP()
+			if err != nil {
+				logs.Error("acceptKCP failed on listener %v waiting for remote %s: %v", localConn.LocalAddr(), remoteAddress, err)
+				return
+			}
+			if udpTunnel.RemoteAddr().String() != remoteAddress {
+				_ = udpTunnel.Close()
+				continue
+			}
+			if !timer.Stop() {
+				logs.Warn("KCP pre-connection timer already fired")
+				_ = udpTunnel.Close()
+				return
+			}
+			done()
 			conn.SetUdpSession(udpTunnel)
 			logs.Trace("successful connection with client ,address %v", udpTunnel.RemoteAddr())
 			//read link info from remote
-			conn.Accept(nps_mux.NewMux(udpTunnel, s.bridgeConnType, s.disconnectTime), func(c net.Conn) {
+			tunnel := mux.NewMux(udpTunnel, "kcp", s.disconnectTime, true)
+			conn.Accept(tunnel, func(c net.Conn) {
 				go s.handleChan(c)
 			})
+			logs.Trace("P2P connection closed, remote %v", udpTunnel.RemoteAddr())
+			_ = tunnel.Close()
 			return
 		}
 	}
 }
 
-// pmux tunnel
+// mux tunnel
 func (s *TRPClient) newChan() {
-	tunnel, err := NewConn(s.bridgeConnType, s.vKey, s.svrAddr, common.WORK_CHAN, s.proxyUrl)
+	tunnel, uuid, err := NewConn(s.bridgeConnType, s.vKey, s.svrAddr, s.proxyUrl)
 	if err != nil {
-		logs.Error("connect to %s error: %v", s.svrAddr, err)
+		logs.Error("Failed to connect to server %s error: %v", s.svrAddr, err)
+		HasFailed = true
+		logs.Warn("The connection server failed and will be reconnected in five seconds.")
 		return
 	}
-	s.tunnel = nps_mux.NewMux(tunnel.Conn, s.bridgeConnType, s.disconnectTime)
-	for {
-		select {
-		case <-s.ctx.Done():
+	if s.uuid == "" {
+		s.uuid = uuid
+	}
+	err = SendType(tunnel, common.WORK_CHAN, s.uuid)
+	if err != nil {
+		logs.Error("Failed to send type to server %s error: %v", s.svrAddr, err)
+		HasFailed = true
+		logs.Warn("The connection server failed and will be reconnected in five seconds.")
+		_ = tunnel.Close()
+		return
+	}
+	if Ver > 4 && s.bridgeConnType == common.CONN_QUIC {
+		qc, ok := tunnel.Conn.(*conn.QuicAutoCloseConn)
+		if !ok {
+			logs.Error("failed to get quic session")
+			_ = tunnel.Close()
 			return
-		default:
 		}
-		src, err := s.tunnel.Accept()
-		if err != nil {
-			logs.Warn("%v", err)
-			s.Close()
-			return
-		}
-		go s.handleChan(src)
-	}
-}
-
-func (s *TRPClient) handleChan(src net.Conn) {
-	lk, err := conn.NewConn(src).GetLinkInfo()
-	if err != nil || lk == nil {
-		src.Close()
-		logs.Error("get connection info from server error %v", err)
-		return
-	}
-	//host for target processing
-	lk.Host = common.FormatAddress(lk.Host)
-	//if Conn type is http, read the request and log
-	if lk.ConnType == "http" {
-		if targetConn, err := net.DialTimeout(common.CONN_TCP, lk.Host, lk.Option.Timeout); err != nil {
-			logs.Warn("connect to %s error %v", lk.Host, err)
-			src.Close()
-		} else {
-			srcConn := conn.GetConn(src, lk.Crypt, lk.Compress, nil, false)
-			go func() {
-				common.CopyBuffer(srcConn, targetConn)
-				srcConn.Close()
-				targetConn.Close()
-			}()
-			for {
-				select {
-				case <-s.ctx.Done():
-					srcConn.Close()
-					targetConn.Close()
-					return
-				default:
-				}
-				if r, err := http.ReadRequest(bufio.NewReader(srcConn)); err != nil {
-					logs.Error("http read error: %v", err)
-					srcConn.Close()
-					targetConn.Close()
-					return
-				} else {
-					remoteAddr := strings.TrimSpace(r.Header.Get("X-Forwarded-For"))
-					if len(remoteAddr) == 0 {
-						remoteAddr = r.RemoteAddr
-					}
-					logs.Trace("http request, method %s, host %s, url %s, remote address %s", r.Method, r.Host, r.URL.Path, remoteAddr)
-					r.Write(targetConn)
-				}
-			}
-		}
-		return
-	}
-	if lk.ConnType == "udp5" {
-		logs.Trace("new %s connection with the goal of %s, remote address:%s", lk.ConnType, lk.Host, lk.RemoteAddr)
-		s.handleUdp(src)
-	}
-	//connect to target if conn type is tcp or udp
-	if targetConn, err := net.DialTimeout(lk.ConnType, lk.Host, lk.Option.Timeout); err != nil {
-		logs.Warn("connect to %s error %v", lk.Host, err)
-		src.Close()
+		sess := qc.GetSession()
+		s.tunnel = sess
 	} else {
-		logs.Trace("new %s connection with the goal of %s, remote address:%s", lk.ConnType, lk.Host, lk.RemoteAddr)
-		conn.CopyWaitGroup(src, targetConn, lk.Crypt, lk.Compress, nil, nil, false, 0, nil, nil)
+		s.tunnel = mux.NewMux(tunnel.Conn, s.bridgeConnType, s.disconnectTime, true)
 	}
-}
 
-func (s *TRPClient) handleUdp(serverConn net.Conn) {
-	// bind a local udp port
-	local, err := net.ListenUDP("udp", nil)
-	defer local.Close()
-	defer serverConn.Close()
-	if err != nil {
-		logs.Error("bind local udp port error %v", err)
-		return
-	}
 	go func() {
-		defer serverConn.Close()
-		b := common.BufPoolUdp.Get().([]byte)
-		defer common.BufPoolUdp.Put(b)
+		defer tunnel.Close()
 		for {
 			select {
 			case <-s.ctx.Done():
 				return
 			default:
 			}
-			n, raddr, err := local.ReadFrom(b)
+			var err error
+			var src net.Conn
+			switch t := s.tunnel.(type) {
+			case *mux.Mux:
+				src, err = t.Accept()
+			case *quic.Conn:
+				var stream *quic.Stream
+				stream, err = t.AcceptStream(s.ctx)
+				if err == nil {
+					src = conn.NewQuicStreamConn(stream, t)
+				}
+			default:
+				err = errors.New("unknown tunnel type")
+			}
+
 			if err != nil {
-				if errors.Is(err, net.ErrClosed) {
-					logs.Info("local UDP closed, exiting goroutine")
-					return
-				}
-				if ne, ok := err.(net.Error); ok && (ne.Temporary() || ne.Timeout()) {
-					logs.Warn("temporary UDP read error, retrying: %v", err)
-					time.Sleep(1 * time.Millisecond)
-					continue
-				}
-				logs.Error("read data from remote server error %v", err)
+				logs.Warn("Accept error on mux: %v", err)
+				s.Close()
 				return
 			}
-			buf := bytes.Buffer{}
-			dgram := common.NewUDPDatagram(common.NewUDPHeader(0, 0, common.ToSocksAddr(raddr)), b[:n])
-			dgram.Write(&buf)
-			b, err := conn.GetLenBytes(buf.Bytes())
-			if err != nil {
-				logs.Warn("get len bytes error %v", err)
-				continue
-			}
-			if _, err := serverConn.Write(b); err != nil {
-				logs.Error("write data to remote error %v", err)
-				return
-			}
+			go s.handleChan(src)
 		}
 	}()
-	b := common.BufPoolUdp.Get().([]byte)
-	defer common.BufPoolUdp.Put(b)
-	for {
-		select {
-		case <-s.ctx.Done():
-			return
-		default:
-		}
-		n, err := serverConn.Read(b)
-		if err != nil {
-			logs.Error("read udp data from server error %v", err)
-			return
-		}
-		udpData, err := common.ReadUDPDatagram(bytes.NewReader(b[:n]))
-		if err != nil {
-			logs.Error("unpack data error %v", err)
+}
+
+func (s *TRPClient) handleChan(src net.Conn) {
+	lk, err := conn.NewConn(src).GetLinkInfo()
+	if err != nil || lk == nil {
+		_ = src.Close()
+		logs.Error("get connection info from server error %v", err)
+		return
+	}
+	//ack
+	if lk.Option.NeedAck {
+		if err := conn.WriteACK(src, lk.Option.Timeout); err != nil {
+			logs.Warn("write ACK failed: %v", err)
+			_ = src.Close()
 			return
 		}
-		raddr, err := net.ResolveUDPAddr("udp", udpData.Header.Addr.String())
-		if err != nil {
-			logs.Error("build remote addr err %v", err)
-			continue // drop silently
-		}
-		_, err = local.WriteTo(udpData.Data, raddr)
-		if err != nil {
-			logs.Error("write data to remote %v error %v", raddr, err)
+		logs.Trace("sent ACK before proceeding")
+	}
+	//socks5 udp
+	if lk.ConnType == "udp5" {
+		logs.Trace("new %s connection of udp5, remote address:%s", lk.ConnType, lk.RemoteAddr)
+		conn.HandleUdp5(s.ctx, src, lk.Option.Timeout)
+		return
+	}
+	//file mode
+	if lk.ConnType == "file" && s.fsm != nil {
+		key := strings.TrimPrefix(strings.TrimSpace(lk.Host), "file://")
+		vl, ok := s.fsm.GetListenerByKey(key)
+		if !ok {
+			logs.Warn("Fail to find file server: %s", key)
+			_ = src.Close()
 			return
 		}
+		rwc := conn.GetConn(src, lk.Crypt, lk.Compress, nil, false, false)
+		c := conn.WrapConn(rwc, src)
+		vl.ServeVirtual(c)
+		return
+	}
+	//host for target processing
+	if lk.Host == "" {
+		logs.Trace("new %s connection, remote address:%s", lk.ConnType, lk.RemoteAddr)
+		_ = src.Close()
+		return
+	}
+	lk.Host = common.FormatAddress(lk.Host)
+	//connect to target if conn type is tcp or udp
+	if targetConn, err := net.DialTimeout(lk.ConnType, lk.Host, lk.Option.Timeout); err != nil {
+		logs.Warn("connect to %s error %v", lk.Host, err)
+		_ = src.Close()
+	} else {
+		logs.Trace("new %s connection with the goal of %s, remote address:%s", lk.ConnType, lk.Host, lk.RemoteAddr)
+		isFramed := lk.ConnType == "udp" && Ver > 6
+		//logs.Debug("%t", isFramed)
+		conn.CopyWaitGroup(src, targetConn, lk.Crypt, lk.Compress, nil, nil, false, 0, nil, nil, false, isFramed)
 	}
 }
 
@@ -343,13 +444,27 @@ func (s *TRPClient) ping() {
 	for {
 		select {
 		case <-s.ticker.C:
-			if s.tunnel == nil || s.tunnel.IsClose {
+			if s.isTunnelClosed() {
 				s.Close()
 				return
 			}
 		case <-s.ctx.Done():
 			return
 		}
+	}
+}
+
+func (s *TRPClient) isTunnelClosed() bool {
+	if s.tunnel == nil {
+		return true
+	}
+	switch t := s.tunnel.(type) {
+	case *mux.Mux:
+		return t.IsClosed()
+	case *quic.Conn:
+		return t.Context().Err() != nil
+	default:
+		return true
 	}
 }
 
@@ -363,13 +478,24 @@ func (s *TRPClient) closing() {
 		s.healthChecker.Stop()
 	}
 	s.cancel()
-	if s.tunnel != nil {
-		_ = s.tunnel.Close()
-	}
+	s.closeTunnel("close")
 	if s.signal != nil {
 		_ = s.signal.Close()
 	}
 	if s.ticker != nil {
 		s.ticker.Stop()
+	}
+}
+
+func (s *TRPClient) closeTunnel(err string) {
+	if s.tunnel != nil {
+		switch t := s.tunnel.(type) {
+		case *mux.Mux:
+			_ = t.Close()
+		case *quic.Conn:
+			_ = t.CloseWithError(0, err)
+		default:
+		}
+		s.tunnel = nil
 	}
 }

@@ -1,4 +1,4 @@
-# NPS Intranet Tunneling
+# NPS Intranet Tunneling (Enhanced)
 
 [![GitHub stars](https://img.shields.io/github/stars/mycoool/nps.svg)](https://github.com/mycoool/nps)
 [![GitHub forks](https://img.shields.io/github/forks/mycoool/nps.svg)](https://github.com/mycoool/nps)
@@ -13,7 +13,7 @@
 
 NPS is a lightweight and efficient intranet tunneling proxy server that supports forwarding multiple protocols (TCP, UDP, HTTP, HTTPS, SOCKS5, etc.). It features an intuitive web management interface that allows secure and convenient access to intranet resources from external networks, addressing a wide range of complex scenarios.
 
-Due to the long-term discontinuation of [NPS](https://github.com/ehang-io/nps), this repository is a community-driven, updated fork based on nps 0.26.
+Since the original [NPS](https://github.com/ehang-io/nps) project has been inactive for a long time, this repository continues its development as one of the actively maintained community versions, featuring extensive refactoring, improved stability, and enhanced functionality.
 
 - **Before asking questions, please check:** [Documentation](https://d-jy.net/docs/nps/) and [Issues](https://github.com/mycoool/nps/issues)
 - **Contributions welcome:** Submit PRs, provide feedback or suggestions, and help drive the project forward.
@@ -26,16 +26,19 @@ Due to the long-term discontinuation of [NPS](https://github.com/ehang-io/nps), 
 ## Key Features
 
 - **Multi-Protocol Support**  
-  Offers TCP/UDP forwarding, HTTP/HTTPS forwarding, HTTP/SOCKS5 proxy, P2P mode, and more to suit various intranet access scenarios.
+  Supports TCP/UDP forwarding, HTTP/HTTPS forwarding, HTTP/SOCKS5 proxy, P2P mode, Proxy Protocol support, HTTP/3 support, and more to accommodate various intranet access scenarios.
 
 - **Cross-Platform Deployment**  
-  Compatible with major platforms like Linux and Windows, with easy installation as a system service.
+  Compatible with major platforms such as Linux and Windows, and can be easily installed as a system service.
 
 - **Web Management Interface**  
-  Provides real-time monitoring of traffic, connection statuses, and client performance in an intuitive interface.
+  Provides real-time monitoring of traffic, connection status, and client states with an intuitive and user-friendly interface.
 
 - **Security and Extensibility**  
-  Includes built-in encryption, traffic limiting, certificate management, and other features to ensure data security.
+  Built-in features such as encrypted transmission, traffic limiting, expiration restrictions, certificate management and renewal ensure data security.
+
+- **Multiple Connection Protocols**
+  Supports connecting to the server using TCP, KCP, TLS, QUIC, WS, and WSS protocols.
 
 ---
 
@@ -68,13 +71,12 @@ docker run -d --restart=always --name npc --net=host mycoool/npc -server=xxx:123
 #### Linux
 ```bash
 # Install (default configuration path: /etc/nps/; binary file path: /usr/bin/)
-./nps install
+wget -qO- https://raw.githubusercontent.com/djylb/nps/refs/heads/master/install.sh | sudo sh -s nps
+nps install
 nps start|stop|restart|uninstall
 
 # Update
-nps stop
-nps-update update
-nps start
+nps update && nps restart
 ```
 
 #### Windows
@@ -93,14 +95,12 @@ nps start
 
 #### Linux
 ```bash
-./npc install
+wget -qO- https://raw.githubusercontent.com/djylb/nps/refs/heads/master/install.sh | sudo sh -s npc
 /usr/bin/npc install -server=xxx:123,yyy:456 -vkey=xxx,yyy -type=tls -log=off
 npc start|stop|restart|uninstall
 
 # Update
-npc stop
-/usr/bin/npc-update update
-npc start
+npc update && npc restart
 ```
 
 #### Windows
@@ -118,3 +118,6 @@ npc start
 > **Tip:** The client supports connecting to multiple servers simultaneously. Example:  
 > `npc -server=xxx:123,yyy:456,zzz:789 -vkey=key1,key2,key3 -type=tcp,tls`  
 > Here, `xxx:123` uses TCP, and `yyy:456` and `zzz:789` use TLS.
+
+> If you need to connect to older server versions, add `-proto_version=0` to the startup command.
+

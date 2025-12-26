@@ -15,7 +15,7 @@
 
 NPS 是一款轻量高效的内网穿透代理服务器，支持多种协议（TCP、UDP、HTTP、HTTPS、SOCKS5 等）转发。它提供直观的 Web 管理界面，使得内网资源能安全、便捷地在外网访问，同时满足多种复杂场景的需求。
 
-由于[NPS](https://github.com/ehang-io/nps)停更已久，本仓库基于 nps 0.26 整合社区更新二次开发而来。
+由于[NPS](https://github.com/ehang-io/nps)停更已久，本仓库整合社区更新二次开发而来。
 
 - **提问前请先查阅：**  [文档](https://d-jy.net/docs/nps/) 与 [Issues](https://github.com/mycoool/nps/issues)
 - **欢迎参与：**  提交 PR、反馈问题或建议，共同推动项目发展。
@@ -28,7 +28,7 @@ NPS 是一款轻量高效的内网穿透代理服务器，支持多种协议（T
 ## 主要特性
 
 - **多协议支持**  
-  TCP/UDP 转发、HTTP/HTTPS 转发、HTTP/SOCKS5 代理、P2P 模式、Proxy Protocol支持等，满足各种内网访问场景。
+  TCP/UDP 转发、HTTP/HTTPS 转发、HTTP/SOCKS5 代理、P2P 模式、Proxy Protocol支持、HTTP/3支持等，满足各种内网访问场景。
 
 - **跨平台部署**  
   支持 Linux、Windows 等主流平台，可轻松安装为系统服务。
@@ -38,6 +38,9 @@ NPS 是一款轻量高效的内网穿透代理服务器，支持多种协议（T
 
 - **安全与扩展**  
   内置加密传输、流量限制、到期限制、证书管理续签等多重功能，保障数据安全。
+
+- **多连接协议**  
+  支持 TCP、KCP、TLS、QUIC、WS、WSS 协议连接服务器。
 
 ---
 
@@ -72,15 +75,12 @@ docker run -d --restart=always --name npc --net=host mycoool/npc -server=xxx:123
 #### Linux
 ```bash
 # 安装（默认配置路径：/etc/nps/；二进制文件路径：/usr/bin/）
-./nps install
+wget -qO- https://fastly.jsdelivr.net/gh/djylb/nps@master/install.sh | sudo sh -s nps
+nps install
 nps start|stop|restart|uninstall
 
 # 更新
-nps stop
-nps-update update
-nps start
-# 热更新
-nps update && mv /usr/local/bin/nps /usr/bin/nps && nps restart
+nps update && nps restart
 ```
 
 #### Windows
@@ -99,16 +99,12 @@ nps update && mv /usr/local/bin/nps /usr/bin/nps && nps restart
 
 #### Linux
 ```bash
-./npc install
+wget -qO- https://fastly.jsdelivr.net/gh/djylb/nps@master/install.sh | sudo sh -s npc
 /usr/bin/npc install -server=xxx:123,yyy:456 -vkey=xxx,yyy -type=tls -log=off
 npc start|stop|restart|uninstall
 
 # 更新
-npc stop
-/usr/bin/npc-update update
-npc start
-# 热更新
-npc update && mv /usr/local/bin/npc /usr/bin/npc && npc restart
+npc update && npc restart
 ```
 
 #### Windows
