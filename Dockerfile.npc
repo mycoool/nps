@@ -13,6 +13,6 @@ COPY --from=builder /go/src/github.com/mycoool/nps/npc /
 COPY --from=builder /go/src/github.com/mycoool/nps/tmp /tmp
 FROM alpine
 RUN apk add --no-cache tzdata nano ca-certificates && update-ca-certificates
-COPY --from=builder /go/src/github.com/djylb/nps/npc /
+COPY --from=builder /go/src/github.com/mycoool/nps/npc /
 VOLUME /conf
 ENTRYPOINT ["/npc"]
