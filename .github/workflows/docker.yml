@@ -2,10 +2,11 @@ name: Docker
 
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
   release:
     types: [ published ]
-    #    branches: [ master ]
-    tags: [ v* ]
 
 jobs:
   build_docker:
