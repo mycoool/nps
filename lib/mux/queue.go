@@ -34,7 +34,6 @@ func (Self *priorityQueue) New() {
 func (Self *priorityQueue) Push(packager *muxPackager) {
 	Self.push(packager)
 	Self.cond.Broadcast()
-	return
 }
 
 func (Self *priorityQueue) push(packager *muxPackager) {
@@ -143,7 +142,6 @@ func (Self *connQueue) New() {
 func (Self *connQueue) Push(connection *Conn) {
 	Self.chain.pushHead(unsafe.Pointer(connection))
 	Self.cond.Broadcast()
-	return
 }
 
 func (Self *connQueue) Pop() (connection *Conn) {
@@ -254,7 +252,6 @@ func (Self *receiveWindowQueue) Push(element *listElement) {
 	if wait == 1 {
 		Self.allowPop()
 	}
-	return
 }
 
 func (Self *receiveWindowQueue) Pop() (element *listElement, err error) {
@@ -303,7 +300,7 @@ func (Self *receiveWindowQueue) allowPop() (closed bool) {
 }
 
 func (Self *receiveWindowQueue) waitPush() (err error) {
-	t := Self.timeout.Sub(time.Now())
+	t := time.Until(Self.timeout)
 	if t <= 0 {
 		// not Set the timeout, so wait for it without timeout, just like a tcp connection
 		select {

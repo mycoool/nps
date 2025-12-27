@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mycoool/nps/lib/crypt"
+	"github.com/mycoool/nps/lib/logs"
 
 	"github.com/beego/beego"
 	"github.com/mycoool/nps/lib/common"
@@ -249,7 +250,6 @@ func clearClientStatus(c *file.Client, name string) {
 		c.Rate = rate.NewRate(int64(2 << 23))
 		c.Rate.Start()
 	}
-	return
 }
 
 func clearStatus(id int, name string) (err error) {
@@ -289,7 +289,7 @@ func (s *ClientController) ChangeStatus() {
 	id := s.GetIntNoErr("id")
 	if client, err := file.GetDb().GetClient(id); err == nil {
 		client.Status = s.GetBoolNoErr("status")
-		if client.Status == false {
+		if !client.Status {
 			server.DelClientConnect(client.Id)
 		}
 		s.AjaxOk("modified success")
@@ -329,5 +329,9 @@ func (s *ClientController) Qr() {
 		return
 	}
 	s.Ctx.Output.Header("Content-Type", "image/png")
-	s.Ctx.Output.Body(png)
+	if err := s.Ctx.Output.Body(png); err != nil {
+		logs.Error("Output body error: %v", err)
+		s.CustomAbort(500, "Failed to write QR code")
+		return
+	}
 }

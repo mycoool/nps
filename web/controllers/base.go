@@ -203,11 +203,9 @@ func (s *BaseController) AjaxTable(list interface{}, cnt int, recordsTotal int, 
 	json := make(map[string]interface{})
 	json["rows"] = list
 	json["total"] = recordsTotal
-	if kwargs != nil {
-		for k, v := range kwargs {
-			if v != nil {
-				json[k] = v
-			}
+	for k, v := range kwargs {
+		if v != nil {
+			json[k] = v
 		}
 	}
 	s.Data["json"] = json

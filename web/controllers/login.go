@@ -364,7 +364,6 @@ func (s *LoginController) Out() {
 }
 
 func clearIpRecord() {
-	rand.Seed(time.Now().UnixNano())
 	x := rand.Intn(100)
 	if x == 1 {
 		loginRecord.Range(func(key, value interface{}) bool {

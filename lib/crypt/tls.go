@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"math/big"
 	"net"
-	"os"
 	"sync"
 	"time"
 
@@ -170,12 +169,6 @@ func AddTrustedCert(vkey string, fp []byte) {
 }
 
 func NewTlsServerConn(conn net.Conn) net.Conn {
-	var err error
-	if err != nil {
-		logs.Error("%v", err)
-		os.Exit(0)
-		return nil
-	}
 	config := &tls.Config{Certificates: []tls.Certificate{cert}}
 	return tls.Server(conn, config)
 }

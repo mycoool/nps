@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -220,27 +219,24 @@ func loadObsoleteJsonFile(b []byte, t interface{}, f func(value interface{})) {
 		case Client:
 			var client Client
 			if err = json.Unmarshal([]byte(v), &client); err != nil {
-				fmt.Println("Error:", err)
+				logs.Error("Error unmarshaling Client: %v", err)
 				return
 			}
 			f(&client)
-			break
 		case Host:
 			var host Host
 			if err = json.Unmarshal([]byte(v), &host); err != nil {
-				fmt.Println("Error:", err)
+				logs.Error("Error unmarshaling Host: %v", err)
 				return
 			}
 			f(&host)
-			break
 		case Tunnel:
 			var tunnel Tunnel
 			if err = json.Unmarshal([]byte(v), &tunnel); err != nil {
-				fmt.Println("Error:", err)
+				logs.Error("Error unmarshaling Tunnel: %v", err)
 				return
 			}
 			f(&tunnel)
-			break
 		}
 	}
 }
@@ -260,7 +256,6 @@ func loadJsonFile(b []byte, t interface{}, f func(value interface{})) error {
 		for i := range clients {
 			f(&clients[i])
 		}
-		break
 	case Host:
 		var hosts []Host
 		if len(b) != 0 {
@@ -272,7 +267,6 @@ func loadJsonFile(b []byte, t interface{}, f func(value interface{})) error {
 		for i := range hosts {
 			f(&hosts[i])
 		}
-		break
 	case Tunnel:
 		var tunnels []Tunnel
 		if len(b) != 0 {
@@ -284,7 +278,6 @@ func loadJsonFile(b []byte, t interface{}, f func(value interface{})) error {
 		for i := range tunnels {
 			f(&tunnels[i])
 		}
-		break
 	}
 	return nil
 }

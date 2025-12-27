@@ -26,10 +26,6 @@ var (
 	startOnce sync.Once
 )
 
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
-
 func StartSystemInfo() {
 	if b, err := beego.AppConfig.Bool("system_info_display"); err == nil && b {
 		startOnce.Do(func() {

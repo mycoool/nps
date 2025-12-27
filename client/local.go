@@ -259,7 +259,6 @@ func (b *P2pBridge) IsServer() bool {
 }
 
 func (b *P2pBridge) CliProcess(*conn.Conn, string) {
-	return
 }
 
 func (mgr *P2PManager) StartLocalServer(l *config.LocalServer) error {

@@ -138,32 +138,32 @@ func (tc *TrafficControl) RunNetRangeTest(f func()) error {
 // create test variables
 func (tc *TrafficControl) getTestVariable() []tcFunc {
 	return []tcFunc{
-		func() { tc.delay("add", "100ms", "10ms", "30%") },
-		func() { tc.loss("add", "1%", "30%") },
-		func() { tc.duplicate("add", "1%") },
-		func() { tc.corrupt("add", "0.2%") },
+		func() { tc.delay("100ms", "10ms", "30%") },
+		func() { tc.loss("1%", "30%") },
+		func() { tc.duplicate("1%") },
+		func() { tc.corrupt("0.2%") },
 	}
 }
 
 // this command sets the transmission of the network card to delayVal. At the same time,
 // about waveRatio of the packets will be delayed by ± wave.
-func (tc *TrafficControl) delay(opt, delayVal, wave, waveRatio string) {
+func (tc *TrafficControl) delay(delayVal, wave, waveRatio string) {
 	tc.params = append(tc.params, []string{"delay", delayVal, wave, waveRatio}...)
 }
 
 // this command sets the transmission of the network card to randomly drop lossRatio of packets with a success rate of lossSuccessRatio.
-func (tc *TrafficControl) loss(opt, lossRatio, lossSuccessRatio string) {
+func (tc *TrafficControl) loss(lossRatio, lossSuccessRatio string) {
 	tc.params = append(tc.params, []string{"loss", lossRatio, lossSuccessRatio}...)
 }
 
 // this command sets the transmission of the network card to randomly generate repeatRatio duplicate packets
-func (tc *TrafficControl) duplicate(opt, duplicateRatio string) {
+func (tc *TrafficControl) duplicate(duplicateRatio string) {
 	tc.params = append(tc.params, []string{"duplicate", duplicateRatio}...)
 }
 
 // this command sets the transmission of the network card to randomly generate corruptRatio corrupted packets.
 // the kernel version must be above 2.6.16
-func (tc *TrafficControl) corrupt(opt, corruptRatio string) {
+func (tc *TrafficControl) corrupt(corruptRatio string) {
 	tc.params = append(tc.params, []string{"corrupt", corruptRatio}...)
 }
 
@@ -217,8 +217,4 @@ func runDocker(dockerName, networkName, ip, testFunName, nowDir string) error {
 	return runCmd(exec.Command("docker", "run", "--env", "GOPROXY=https://goproxy.cn", "--rm", "--name", dockerName, "--net", networkName,
 		"--cap-add=NET_ADMIN", "--ip", ip, "-v", nowDir+`:/usr/src/myapp`, "-w", `/usr/src/myapp`, "golang", "go", "test",
 		"-v", "-run", testFunName, "./"))
-}
-
-func stopDocker(dockerName string) error {
-	return runCmd(exec.Command("docker", "stop", dockerName))
 }

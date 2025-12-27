@@ -8,8 +8,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/mycoool/nps/lib/common"
 	"github.com/gorilla/websocket"
+	"github.com/mycoool/nps/lib/common"
+	"github.com/mycoool/nps/lib/logs"
 )
 
 type WsConn struct {
@@ -110,7 +111,11 @@ func NewWSListener(base net.Listener, path, trustedIps, realIpHeader string) net
 		ch <- c
 	})
 	srv := &http.Server{Handler: mux}
-	go srv.Serve(base)
+	go func() {
+		if err := srv.Serve(base); err != nil && err != http.ErrServerClosed {
+			logs.Error("HTTP server error: %v", err)
+		}
+	}()
 	go func() {
 		<-hl.closeCh
 		_ = srv.Close()
@@ -145,7 +150,11 @@ func NewWSSListener(base net.Listener, path string, cert tls.Certificate, truste
 	})
 	tlsConfig := &tls.Config{Certificates: []tls.Certificate{cert}}
 	srv := &http.Server{Handler: mux, TLSConfig: tlsConfig}
-	go srv.Serve(tls.NewListener(base, tlsConfig))
+	go func() {
+		if err := srv.Serve(tls.NewListener(base, tlsConfig)); err != nil && err != http.ErrServerClosed {
+			logs.Error("HTTPS server error: %v", err)
+		}
+	}()
 	go func() {
 		<-hl.closeCh
 		_ = srv.Close()

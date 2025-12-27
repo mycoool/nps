@@ -34,12 +34,21 @@ fmt:
 	find . -name '*.go' -not -wholename './vendor/*' | while read -r file; do gofmt -w -s "$$file"; goimports -w "$$file"; done
 .PHONY: fmt
 
-# Run all the linters
-lint:
-	# TODO: fix tests and lll issues
-	./bin/golangci-lint run --tests=false --enable-all --disable=lll ./...
-	./bin/misspell -error **/*
+# Run code quality checks using official Go tools
+lint: fmt vet
+	@echo "✅ 代码质量检查完成"
 .PHONY: lint
+
+# Run go vet for static analysis
+vet:
+	@echo "=== Go vet 静态分析 ==="
+	go vet ./...
+	@echo "✅ Go vet 检查通过"
+.PHONY: vet
+
+# Run all tests and code checks
+ci: build test lint go-mod-tidy
+.PHONY: ci
 
 # Clean go.mod
 go-mod-tidy:

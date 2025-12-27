@@ -101,13 +101,13 @@ func (s *Conn) GetHost() (method, address string, rb []byte, err error, r *http.
 		return
 	}
 	if hostPortURL.Opaque == "443" {
-		if strings.Index(r.Host, ":") == -1 {
+		if !strings.Contains(r.Host, ":") {
 			address = r.Host + ":443"
 		} else {
 			address = r.Host
 		}
 	} else {
-		if strings.Index(r.Host, ":") == -1 {
+		if !strings.Contains(r.Host, ":") {
 			address = r.Host + ":80"
 		} else {
 			address = r.Host

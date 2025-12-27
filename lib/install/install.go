@@ -250,13 +250,11 @@ func downloadLatest(bin string) string {
 			if a.Name != filename {
 				continue
 			}
-			//fmt.Println("Expected Hash:", a.Digest)
 			if strings.HasPrefix(a.Digest, "sha256:") {
 				expectedHash = strings.TrimPrefix(a.Digest, "sha256:")
 			}
 			break
 		}
-		//fmt.Println("Expected SHA256:", expectedHash)
 		if expectedHash == "" {
 			fmt.Println("No SHA256 digest found for", filename, "; skipping hash check")
 		}
@@ -455,7 +453,6 @@ func MkidrDirAll(path string, v ...string) {
 func CopyDir(srcPath string, destPath string) error {
 	//检测目录正确性
 	if srcInfo, err := os.Stat(srcPath); err != nil {
-		//fmt.Println(err.Error())
 		log.Println("Failed to copy source directory.")
 		return err
 	} else {

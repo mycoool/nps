@@ -7,7 +7,6 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/base64"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -61,7 +60,6 @@ func GetTaskStatus(server string, vKey string, tp string, proxyUrl string) {
 	if err != nil {
 		log.Fatalf("Failed to connect: %v", err)
 	}
-	//defer c.Close()
 	err = SendType(c, common.WORK_CONFIG, uuid)
 	if err != nil {
 		log.Fatalf("Failed to send type: %v", err)
@@ -75,12 +73,10 @@ func GetTaskStatus(server string, vKey string, tp string, proxyUrl string) {
 	var isPub bool
 	_ = binary.Read(c, binary.LittleEndian, &isPub)
 	length, err := c.GetLen()
-	//log.Println(length)
 	if err != nil {
 		log.Fatalf("Failed to read length: %v", err)
 	}
 	data, err := c.GetShortContent(length)
-	//log.Println(string(data))
 	if err != nil {
 		log.Fatalf("Failed to read content: %v", err)
 	}
@@ -88,14 +84,14 @@ func GetTaskStatus(server string, vKey string, tp string, proxyUrl string) {
 	if len(parts) > 0 && parts[len(parts)-1] == "" {
 		parts = parts[:len(parts)-1]
 	}
-	fmt.Println("===== Active Tunnels/Hosts =====")
-	fmt.Printf("Total active: %d\n", len(parts))
+	log.Printf("===== Active Tunnels/Hosts =====")
+	log.Printf("Total active: %d", len(parts))
 	for i, name := range parts {
 		display := name
 		if display == "" {
 			display = "(no remark)"
 		}
-		fmt.Printf("  %d. %s\n", i+1, display)
+		log.Printf("  %d. %s", i+1, display)
 	}
 	os.Exit(0)
 }
@@ -165,7 +161,11 @@ func StartFromFile(pCtx context.Context, pCancel context.CancelFunc, path string
 			p2pm := NewP2PManager(pCtx, pCancel, cnf.CommonConfig)
 			//create local server secret or p2p
 			for _, v := range cnf.LocalServer {
-				go p2pm.StartLocalServer(v)
+				go func(lv *config.LocalServer) {
+					if err := p2pm.StartLocalServer(lv); err != nil {
+						logs.Error("StartLocalServer error: %v", err)
+					}
+				}(v)
 			}
 			return
 		}
@@ -430,7 +430,9 @@ func NewConn(tp string, vkey string, server string, proxyUrl string) (*conn.Conn
 
 	//logs.Debug("SetDeadline")
 	_ = connection.SetDeadline(time.Now().Add(timeout))
-	defer connection.SetDeadline(time.Time{})
+	defer func() {
+		_ = connection.SetDeadline(time.Time{})
+	}()
 
 	c := conn.NewConn(connection)
 	if _, err := c.BufferWrite([]byte(common.CONN_TEST)); err != nil {
@@ -540,7 +542,7 @@ func NewConn(tp string, vkey string, server string, proxyUrl string) (*conn.Conn
 		if err != nil {
 			logs.Error("error reading server response: %v", err)
 			_ = c.Close()
-			return nil, "", errors.New(fmt.Sprintf("Validation key %s incorrect", vkey))
+			return nil, "", fmt.Errorf("Validation key %s incorrect", vkey)
 		}
 		if !bytes.Equal(b, crypt.ComputeHMAC(vkey, ts, hmacBuf, []byte(version.GetVersion(Ver)))) {
 			logs.Warn("The client does not match the server version. The current core version of the client is %s", version.GetVersion(Ver))
@@ -679,10 +681,4 @@ func NewHttpProxyConn(proxyURL *url.URL, remoteAddr string, timeout time.Duratio
 		return nil, errors.New("proxy CONNECT failed: " + resp.Status)
 	}
 	return proxyConn, nil
-}
-
-// get a basic auth string
-func getBasicAuth(username, password string) string {
-	auth := username + ":" + password
-	return base64.StdEncoding.EncodeToString([]byte(auth))
 }

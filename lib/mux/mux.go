@@ -151,7 +151,6 @@ func (s *Mux) sendInfo(flag uint8, id int32, priority bool, data interface{}) {
 		return
 	}
 	s.writeQueue.Push(pack)
-	return
 }
 
 func (s *Mux) writeSession() {
@@ -193,7 +192,6 @@ func (s *Mux) writeSession() {
 
 func (s *Mux) ping() {
 	go func() {
-		rand.Seed(time.Now().UnixNano())
 		buf := make([]byte, 8+PingMaxPad)
 		initialJitter := time.Duration(rand.Int63n(int64(PingJitter))) - PingJitter/2
 		timer := time.NewTimer(PingInterval + initialJitter)

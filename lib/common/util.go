@@ -87,10 +87,7 @@ func GetIpByAddr(host string) string {
 }
 
 func IsDomain(s string) bool {
-	if net.ParseIP(s) != nil {
-		return false
-	}
-	return true
+	return net.ParseIP(s) == nil
 }
 
 // GetPortByAddr
@@ -1109,7 +1106,7 @@ func CalibrateTimeOffset(server string) (time.Duration, error) {
 	if err != nil {
 		return 0, err
 	}
-	return ntpTime.Sub(time.Now()), nil
+	return time.Until(ntpTime), nil
 }
 
 func TimeOffset() time.Duration {

@@ -96,7 +96,6 @@ func (s *Conn) closeProcess() {
 	}
 	s.sendWindow.CloseWindow()
 	s.receiveWindow.CloseWindow()
-	return
 }
 
 func (s *Conn) LocalAddr() net.Addr {
@@ -276,7 +275,6 @@ func (Self *receiveWindow) calcSize() {
 		Self.count = -10
 	}
 	Self.count += 1
-	return
 }
 
 func (Self *receiveWindow) Write(buf []byte, l uint16, part bool, id int32) (err error) {
@@ -403,7 +401,6 @@ func (Self *receiveWindow) sendStatus(id int32, l uint16) {
 		runtime.Gosched()
 		// another goroutine change remaining or wait status, make sure
 	}
-	return
 }
 
 func (Self *receiveWindow) SetTimeOut(t time.Time) {
@@ -609,7 +606,7 @@ start:
 }
 
 func (Self *sendWindow) waitReceiveWindow() (err error) {
-	t := Self.timeout.Sub(time.Now())
+	t := time.Until(Self.timeout)
 	if t < 0 { // not set the timeout, wait for it as long as connection close
 		select {
 		case _, ok := <-Self.setSizeCh:
@@ -645,7 +642,7 @@ func (Self *sendWindow) WriteFull(buf []byte, id int32) (n int, err error) {
 	for {
 		bufSeg, l, part, err = Self.WriteTo()
 		// get the buf segments from send window
-		if bufSeg == nil && part == false && err == io.EOF {
+		if bufSeg == nil && !part && err == io.EOF {
 			// send window is drain, break the loop
 			err = nil
 			break
@@ -688,7 +685,7 @@ func (Self *writeBandwidth) StartRead() {
 	if Self.readEnd.IsZero() {
 		Self.readEnd = time.Now()
 	}
-	Self.duration += time.Now().Sub(Self.readEnd).Seconds()
+	Self.duration += time.Since(Self.readEnd).Seconds()
 	if Self.bufLength >= writeCalcThreshold*atomic.LoadUint32(&Self.ratio) {
 		Self.calcBandWidth()
 	}

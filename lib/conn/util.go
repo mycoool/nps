@@ -71,7 +71,7 @@ func IsTempOrTimeout(err error) bool {
 	}
 	var ne net.Error
 	if errors.As(err, &ne) {
-		return ne.Temporary() || ne.Timeout()
+		return ne.Timeout()
 	} else {
 		s := strings.ToLower(strings.ReplaceAll(err.Error(), " ", ""))
 		return strings.Contains(s, "timeout")
@@ -241,7 +241,6 @@ func CopyWaitGroup(conn1, conn2 net.Conn, crypt bool, snappy bool, rate *rate.Ra
 	wg.Wait()
 	_ = conn1.Close()
 	_ = conn2.Close()
-	return
 }
 
 func ParseAddr(addr string) net.Addr {

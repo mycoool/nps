@@ -61,12 +61,6 @@ func (s *BaseServer) FlowAddHost(host *file.Host, in, out int64) {
 	host.Flow.InletFlow += in
 }
 
-// write fail bytes to the connection
-func (s *BaseServer) writeConnFail(c net.Conn) {
-	_, _ = c.Write([]byte(common.ConnectionFailBytes))
-	_, _ = c.Write(s.ErrorContent)
-}
-
 // Auth check
 func (s *BaseServer) Auth(r *http.Request, c *conn.Conn, u, p string, multiAccount, userAuth *file.MultiAccount) error {
 	if !common.CheckAuth(r, u, p, file.GetAccountMap(multiAccount), file.GetAccountMap(userAuth)) {
