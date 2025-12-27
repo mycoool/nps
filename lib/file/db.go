@@ -1,3 +1,5 @@
+// Package file 提供数据库操作和配置管理功能
+// 包括客户端、任务、主机、全局配置的增删改查
 package file
 
 import (
@@ -13,19 +15,32 @@ import (
 	"github.com/mycoool/nps/lib/rate"
 )
 
+// DbUtils 数据库工具类
+// 提供对JSON数据库的各种操作接口
 type DbUtils struct {
-	JsonDb *JsonDb
+	JsonDb *JsonDb // JSON数据库实例
 }
 
 var (
-	Db                *DbUtils
-	once              sync.Once
-	HostIndex         = index.NewDomainIndex()
-	Blake2bVkeyIndex  = index.NewStringIDIndex()
+	// Db 数据库单例实例
+	Db *DbUtils
+	// once 用于确保数据库只初始化一次
+	once sync.Once
+	// HostIndex 主机索引，用于快速通过域名查找主机配置
+	HostIndex = index.NewDomainIndex()
+	// Blake2bVkeyIndex 客户端vkey的Blake2b哈希索引，用于快速查找客户端
+	Blake2bVkeyIndex = index.NewStringIDIndex()
+	// TaskPasswordIndex 任务密码的MD5索引，用于快速查找任务
 	TaskPasswordIndex = index.NewStringIDIndex()
 )
 
-// GetDb init data from file
+// GetDb 获取数据库单例实例
+// 使用sync.Once确保只初始化一次
+// 初始化时会加载所有配置文件（客户端、任务、主机、全局配置）
+//
+// 返回:
+//
+//	*DbUtils: 数据库工具实例
 func GetDb() *DbUtils {
 	once.Do(func() {
 		jsonDb := NewJsonDb(common.GetRunPath())
@@ -38,6 +53,19 @@ func GetDb() *DbUtils {
 	return Db
 }
 
+// GetMapKeys 获取sync.Map的所有key
+// 支持按指定字段排序
+//
+// 参数:
+//
+//	m: sync.Map对象
+//	isSort: 是否按sortKey排序
+//	sortKey: 排序字段（InletFlow、ExportFlow等）
+//	order: 排序方式
+//
+// 返回:
+//
+//	[]int: key列表
 func GetMapKeys(m *sync.Map, isSort bool, sortKey, order string) (keys []int) {
 	if (sortKey == "InletFlow" || sortKey == "ExportFlow") && isSort {
 		return sortClientByKey(m, sortKey, order)
@@ -50,6 +78,21 @@ func GetMapKeys(m *sync.Map, isSort bool, sortKey, order string) (keys []int) {
 	return
 }
 
+// GetClientList 分页获取客户端列表
+//
+// 参数:
+//
+//	start: 起始位置（分页）
+//	length: 每页数量，0表示全部
+//	search: 搜索关键字（匹配ID、vkey、备注）
+//	sort: 排序字段
+//	order: 排序方式（asc/desc）
+//	clientId: 客户端ID过滤，0表示不限制
+//
+// 返回:
+//
+//	[]*Client: 客户端列表
+//	int: 总数量
 func (s *DbUtils) GetClientList(start, length int, search, sort, order string, clientId int) ([]*Client, int) {
 	list := make([]*Client, 0)
 	var cnt int
@@ -80,6 +123,20 @@ func (s *DbUtils) GetClientList(start, length int, search, sort, order string, c
 	return list, cnt
 }
 
+// GetIdByVerifyKey 根据验证密钥查找客户端ID
+// 客户端连接时会发送vkey的哈希值，服务器通过此函数查找对应的客户端
+//
+// 参数:
+//
+//	vKey: 客户端vkey的哈希值
+//	addr: 客户端地址
+//	localAddr: 客户端本地地址
+//	hashFunc: 哈希函数
+//
+// 返回:
+//
+//	int: 客户端ID
+//	error: 错误信息，找不到返回错误
 func (s *DbUtils) GetIdByVerifyKey(vKey, addr, localAddr string, hashFunc func(string) string) (id int, err error) {
 	var exist bool
 	s.JsonDb.Clients.Range(func(key, value interface{}) bool {
@@ -127,6 +184,17 @@ func (s *DbUtils) GetClientIdByMd5Vkey(vkey string) (id int, err error) {
 	return
 }
 
+// NewTask 创建新任务
+// 自动生成密钥（如果需要），初始化流量对象，建立密码索引
+// 将socks5和httpProxy模式转换为mixProxy模式
+//
+// 参数:
+//
+//	t: 隧道任务配置
+//
+// 返回:
+//
+//	error: 错误信息
 func (s *DbUtils) NewTask(t *Tunnel) (err error) {
 	//s.JsonDb.Tasks.Range(func(key, value interface{}) bool {
 	//	v := value.(*Tunnel)
@@ -174,6 +242,16 @@ func (s *DbUtils) NewTask(t *Tunnel) (err error) {
 	return
 }
 
+// UpdateTask 更新任务配置
+// 处理密码更新和索引维护
+//
+// 参数:
+//
+//	t: 隧道任务配置
+//
+// 返回:
+//
+//	error: 错误信息
 func (s *DbUtils) UpdateTask(t *Tunnel) error {
 	if (t.Mode == "secret" || t.Mode == "p2p") && t.Password == "" {
 		t.Password = crypt.GetRandomString(16, t.Id)
@@ -215,12 +293,31 @@ func (s *DbUtils) UpdateTask(t *Tunnel) error {
 	return nil
 }
 
+// SaveGlobal 保存全局配置
+//
+// 参数:
+//
+//	t: 全局配置对象
+//
+// 返回:
+//
+//	error: 错误信息
 func (s *DbUtils) SaveGlobal(t *Glob) error {
 	s.JsonDb.Global = t
 	s.JsonDb.StoreGlobalToJsonFile()
 	return nil
 }
 
+// DelTask 删除指定ID的任务
+// 同时移除密码索引
+//
+// 参数:
+//
+//	id: 任务ID
+//
+// 返回:
+//
+//	error: 错误信息
 func (s *DbUtils) DelTask(id int) error {
 	if v, ok := s.JsonDb.Tasks.Load(id); ok {
 		t := v.(*Tunnel)
@@ -231,7 +328,16 @@ func (s *DbUtils) DelTask(id int) error {
 	return nil
 }
 
-// GetTaskByMd5Password md5 password
+// GetTaskByMd5Password 根据密码的MD5哈希查找任务
+// 用于secret模式和p2p模式的任务查找
+//
+// 参数:
+//
+//	p: 密码的MD5哈希值
+//
+// 返回:
+//
+//	*Tunnel: 任务对象，未找到返回nil
 func (s *DbUtils) GetTaskByMd5Password(p string) (t *Tunnel) {
 	id, ok := TaskPasswordIndex.Get(p)
 	if ok {
@@ -254,6 +360,16 @@ func (s *DbUtils) GetTaskByMd5PasswordOld(p string) (t *Tunnel) {
 	return
 }
 
+// GetTask 根据ID获取任务
+//
+// 参数:
+//
+//	id: 任务ID
+//
+// 返回:
+//
+//	*Tunnel: 任务对象
+//	error: 错误信息
 func (s *DbUtils) GetTask(id int) (t *Tunnel, err error) {
 	if v, ok := s.JsonDb.Tasks.Load(id); ok {
 		t = v.(*Tunnel)
@@ -263,6 +379,16 @@ func (s *DbUtils) GetTask(id int) (t *Tunnel, err error) {
 	return
 }
 
+// DelHost 删除指定ID的主机
+// 同时从域名索引中移除
+//
+// 参数:
+//
+//	id: 主机ID
+//
+// 返回:
+//
+//	error: 错误信息
 func (s *DbUtils) DelHost(id int) error {
 	if v, ok := s.JsonDb.Hosts.Load(id); ok {
 		h := v.(*Host)
@@ -273,6 +399,16 @@ func (s *DbUtils) DelHost(id int) error {
 	return nil
 }
 
+// IsHostExist 检查主机是否已存在
+// 比较主机名、路径、协议是否相同
+//
+// 参数:
+//
+//	h: 主机配置
+//
+// 返回:
+//
+//	bool: true表示已存在
 func (s *DbUtils) IsHostExist(h *Host) bool {
 	var exist bool
 	if h.Location == "" {
@@ -292,6 +428,16 @@ func (s *DbUtils) IsHostExist(h *Host) bool {
 	return exist
 }
 
+// IsHostModify 检查主机配置是否已修改
+// 比较关键字段是否有变化
+//
+// 参数:
+//
+//	h: 主机配置
+//
+// 返回:
+//
+//	bool: true表示有修改或主机不存在
 func (s *DbUtils) IsHostModify(h *Host) bool {
 	if h == nil {
 		return true
@@ -315,6 +461,16 @@ func (s *DbUtils) IsHostModify(h *Host) bool {
 	return false
 }
 
+// NewHost 创建新主机
+// 检查是否存在，初始化流量对象，建立域名索引
+//
+// 参数:
+//
+//	t: 主机配置
+//
+// 返回:
+//
+//	error: 错误信息
 func (s *DbUtils) NewHost(t *Host) error {
 	if t.Location == "" {
 		t.Location = "/"
@@ -334,6 +490,19 @@ func (s *DbUtils) NewHost(t *Host) error {
 	return nil
 }
 
+// GetHost 分页获取主机列表
+//
+// 参数:
+//
+//	start: 起始位置（分页）
+//	length: 每页数量
+//	id: 客户端ID过滤，0表示不限制
+//	search: 搜索关键字（匹配ID、主机名、备注、客户端vkey）
+//
+// 返回:
+//
+//	[]*Host: 主机列表
+//	int: 总数量
 func (s *DbUtils) GetHost(start, length int, id int, search string) ([]*Host, int) {
 	list := make([]*Host, 0)
 	var cnt int
@@ -360,6 +529,16 @@ func (s *DbUtils) GetHost(start, length int, id int, search string) ([]*Host, in
 	return list, cnt
 }
 
+// DelClient 删除指定ID的客户端
+// 停止速率限制器，移除vkey索引
+//
+// 参数:
+//
+//	id: 客户端ID
+//
+// 返回:
+//
+//	error: 错误信息
 func (s *DbUtils) DelClient(id int) error {
 	if v, ok := s.JsonDb.Clients.Load(id); ok {
 		c := v.(*Client)
@@ -373,6 +552,16 @@ func (s *DbUtils) DelClient(id int) error {
 	return nil
 }
 
+// NewClient 创建新客户端
+// 验证vkey和用户名唯一性，初始化速率限制器
+//
+// 参数:
+//
+//	c: 客户端配置
+//
+// 返回:
+//
+//	error: 错误信息
 func (s *DbUtils) NewClient(c *Client) error {
 	var isNotSet bool
 	if c.WebUserName != "" && !s.VerifyUserName(c.WebUserName, c.Id) {
@@ -408,6 +597,16 @@ reset:
 	return nil
 }
 
+// VerifyVkey 验证vkey是否唯一（排除指定ID）
+//
+// 参数:
+//
+//	vkey: 待验证的vkey
+//	id: 要排除的客户端ID
+//
+// 返回:
+//
+//	bool: true表示唯一，false表示重复
 func (s *DbUtils) VerifyVkey(vkey string, id int) (res bool) {
 	res = true
 	s.JsonDb.Clients.Range(func(key, value interface{}) bool {
@@ -421,6 +620,16 @@ func (s *DbUtils) VerifyVkey(vkey string, id int) (res bool) {
 	return res
 }
 
+// VerifyUserName 验证Web登录用户名是否唯一（排除指定ID）
+//
+// 参数:
+//
+//	username: 待验证的用户名
+//	id: 要排除的客户端ID
+//
+// 返回:
+//
+//	bool: true表示唯一，false表示重复
 func (s *DbUtils) VerifyUserName(username string, id int) (res bool) {
 	res = true
 	s.JsonDb.Clients.Range(func(key, value interface{}) bool {
@@ -434,6 +643,16 @@ func (s *DbUtils) VerifyUserName(username string, id int) (res bool) {
 	return res
 }
 
+// UpdateClient 更新客户端配置
+// 更新索引和速率限制器
+//
+// 参数:
+//
+//	t: 客户端配置
+//
+// 返回:
+//
+//	error: 错误信息
 func (s *DbUtils) UpdateClient(t *Client) error {
 	if v, ok := s.JsonDb.Clients.Load(t.Id); ok {
 		c := v.(*Client)
@@ -455,6 +674,16 @@ func (s *DbUtils) UpdateClient(t *Client) error {
 	return nil
 }
 
+// IsPubClient 判断是否为公共客户端
+// 公共客户端不显示在列表中（NoDisplay=true）
+//
+// 参数:
+//
+//	id: 客户端ID
+//
+// 返回:
+//
+//	bool: true表示是公共客户端
 func (s *DbUtils) IsPubClient(id int) bool {
 	client, err := s.GetClient(id)
 	if err == nil {
@@ -463,6 +692,16 @@ func (s *DbUtils) IsPubClient(id int) bool {
 	return false
 }
 
+// GetClient 根据ID获取客户端
+//
+// 参数:
+//
+//	id: 客户端ID
+//
+// 返回:
+//
+//	*Client: 客户端对象
+//	error: 错误信息
 func (s *DbUtils) GetClient(id int) (c *Client, err error) {
 	if v, ok := s.JsonDb.Clients.Load(id); ok {
 		c = v.(*Client)
@@ -472,10 +711,25 @@ func (s *DbUtils) GetClient(id int) (c *Client, err error) {
 	return
 }
 
+// GetGlobal 获取全局配置
+//
+// 返回:
+//
+//	*Glob: 全局配置对象
 func (s *DbUtils) GetGlobal() (c *Glob) {
 	return s.JsonDb.Global
 }
 
+// GetHostById 根据ID获取主机
+//
+// 参数:
+//
+//	id: 主机ID
+//
+// 返回:
+//
+//	*Host: 主机对象
+//	error: 错误信息
 func (s *DbUtils) GetHostById(id int) (h *Host, err error) {
 	if v, ok := s.JsonDb.Hosts.Load(id); ok {
 		h = v.(*Host)
@@ -485,7 +739,19 @@ func (s *DbUtils) GetHostById(id int) (h *Host, err error) {
 	return
 }
 
-// GetInfoByHost get key by host from x
+// GetInfoByHost 根据主机名和请求路径查找最佳匹配的主机配置
+// 支持通配符匹配（*.example.com）和路径匹配
+// 优先级：路径最长匹配 > 域名最长匹配 > 精确匹配
+//
+// 参数:
+//
+//	host: 主机名
+//	r: HTTP请求对象
+//
+// 返回:
+//
+//	*Host: 最佳匹配的主机配置
+//	error: 错误信息
 func (s *DbUtils) GetInfoByHost(host string, r *http.Request) (h *Host, err error) {
 	host = common.GetIpByAddr(host)
 	hostLength := len(host)
@@ -571,6 +837,17 @@ func (s *DbUtils) GetInfoByHost(host string, r *http.Request) (h *Host, err erro
 	return nil, errors.New("the host could not be parsed")
 }
 
+// FindCertByHost 根据主机名查找证书配置
+// 用于HTTPS连接的证书选择，优先匹配根路径
+//
+// 参数:
+//
+//	host: 主机名
+//
+// 返回:
+//
+//	*Host: 主机配置（包含证书信息）
+//	error: 错误信息
 func (s *DbUtils) FindCertByHost(host string) (*Host, error) {
 	if host == "" {
 		return nil, errors.New("invalid Host")

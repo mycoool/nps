@@ -1,3 +1,5 @@
+// Package client 提供nps客户端的核心功能
+// 包括与服务器的连接建立、认证、任务配置同步、P2P管理等
 package client
 
 import (
@@ -30,31 +32,57 @@ import (
 	"golang.org/x/net/proxy"
 )
 
-const MaxPad = 64
+const MaxPad = 64 // 最大填充字节数，用于混淆
 
-var Ver = version.GetLatestIndex()
-var SkipTLSVerify = false
-var DisableP2P = false
-var AutoReconnect = true
-var P2PMode = common.CONN_QUIC
+var (
+	// Ver 客户端核心版本索引，用于协议协商
+	Ver = version.GetLatestIndex()
+	// SkipTLSVerify 是否跳过TLS证书验证
+	// true: 不验证服务器证书（不安全）
+	// false: 验证服务器证书（推荐）
+	SkipTLSVerify = false
+	// DisableP2P 是否禁用P2P功能
+	DisableP2P = false
+	// AutoReconnect 是否自动重连
+	// true: 连接断开后自动重连
+	// false: 连接断开后退出
+	AutoReconnect = true
+	// P2PMode P2P连接模式，默认使用QUIC协议
+	P2PMode = common.CONN_QUIC
+)
 
-var TlsCfg = &tls.Config{
-	InsecureSkipVerify: true,
-	ServerName:         crypt.GetFakeDomainName(),
-	NextProtos:         []string{"h3"},
-}
+var (
+	// TlsCfg TLS配置，用于客户端连接
+	TlsCfg = &tls.Config{
+		InsecureSkipVerify: true,                      // 跳过证书验证
+		ServerName:         crypt.GetFakeDomainName(), // 使用伪造的域名
+		NextProtos:         []string{"h3"},            // 支持HTTP/3协议
+	}
+	// QuicConfig QUIC协议配置
+	QuicConfig = &quic.Config{
+		KeepAlivePeriod:    10 * time.Second, // 保持活跃间隔
+		MaxIdleTimeout:     30 * time.Second, // 最大空闲超时
+		MaxIncomingStreams: 100000,           // 最大并发流数
+	}
+)
 
-var QuicConfig = &quic.Config{
-	KeepAlivePeriod:    10 * time.Second,
-	MaxIdleTimeout:     30 * time.Second,
-	MaxIncomingStreams: 100000,
-}
-
+// init 包初始化函数
+// 1. 设置随机数种子
+// 2. 初始化TLS加密模块
 func init() {
 	rand.Seed(time.Now().UnixNano())
 	crypt.InitTls(tls.Certificate{})
 }
 
+// GetTaskStatus 获取客户端在服务器上的任务状态
+// 连接到服务器并查询当前激活的隧道和主机列表
+//
+// 参数:
+//
+//	server: 服务器地址（格式：host:port 或 host:port/path）
+//	vKey: 客户端验证密钥
+//	tp: 连接类型（tcp、tls、ws、wss、quic、kcp）
+//	proxyUrl: 代理URL（可选，如：socks5://127.0.0.1:1080）
 func GetTaskStatus(server string, vKey string, tp string, proxyUrl string) {
 	c, uuid, err := NewConn(tp, vKey, server, proxyUrl)
 	if err != nil {
@@ -96,6 +124,17 @@ func GetTaskStatus(server string, vKey string, tp string, proxyUrl string) {
 	os.Exit(0)
 }
 
+// RegisterLocalIp 注册本地IP到服务器
+// 在服务器上注册一个公网IP，有效期由hour参数指定
+// 用于客户端在本地网络中获取临时公网访问能力
+//
+// 参数:
+//
+//	server: 服务器地址
+//	vKey: 客户端验证密钥
+//	tp: 连接类型
+//	proxyUrl: 代理URL（可选）
+//	hour: 有效期（小时）
 func RegisterLocalIp(server string, vKey string, tp string, proxyUrl string, hour int) {
 	c, uuid, err := NewConn(tp, vKey, server, proxyUrl)
 	if err != nil {
@@ -115,6 +154,19 @@ func RegisterLocalIp(server string, vKey string, tp string, proxyUrl string, hou
 
 var errAdd = errors.New("the server returned an error, which port or host may have been occupied or not allowed to open")
 
+// StartFromFile 从配置文件启动客户端
+// 这是客户端的主启动函数，会：
+// 1. 加载并解析配置文件
+// 2. 设置自定义DNS服务器
+// 3. 同步NTP时间
+// 4. 如果配置了LocalServer，则启动P2P本地服务器
+// 5. 否则连接到服务器，同步配置，启动反向代理客户端
+//
+// 参数:
+//
+//	pCtx: 父上下文，用于取消操作
+//	pCancel: 取消函数
+//	path: 配置文件路径
 func StartFromFile(pCtx context.Context, pCancel context.CancelFunc, path string) {
 	cnf, err := config.NewConfig(path)
 	if err != nil || cnf.CommonConfig == nil {
@@ -261,6 +313,18 @@ func StartFromFile(pCtx context.Context, pCancel context.CancelFunc, path string
 	}
 }
 
+// VerifyState 验证TLS连接状态和证书
+// 计算服务器证书的SHA256指纹，并验证证书有效性
+//
+// 参数:
+//
+//	state: TLS连接状态
+//	host: 服务器主机名（用于SNI验证）
+//
+// 返回:
+//
+//	[]byte: 证书指纹（SHA256）
+//	bool: 证书是否验证成功
 func VerifyState(state tls.ConnectionState, host string) (fingerprint []byte, verified bool) {
 	if len(state.PeerCertificates) == 0 {
 		return nil, false
@@ -285,6 +349,18 @@ func VerifyState(state tls.ConnectionState, host string) (fingerprint []byte, ve
 	return sum[:], verified
 }
 
+// VerifyTLS 验证TLS连接的证书
+// 对网络连接执行TLS握手并验证证书
+//
+// 参数:
+//
+//	connection: 网络连接（支持*conn.TlsConn和*tls.Conn）
+//	host: 服务器主机名
+//
+// 返回:
+//
+//	[]byte: 证书指纹
+//	bool: 证书是否验证成功
 func VerifyTLS(connection net.Conn, host string) (fingerprint []byte, verified bool) {
 	var tlsConn *tls.Conn
 	if tc, ok := connection.(*conn.TlsConn); ok {
@@ -300,6 +376,17 @@ func VerifyTLS(connection net.Conn, host string) (fingerprint []byte, verified b
 	return VerifyState(tlsConn.ConnectionState(), host)
 }
 
+// EnsurePort 确保服务器地址包含端口号
+// 如果地址中缺少端口，则根据连接类型添加默认端口
+//
+// 参数:
+//
+//	server: 服务器地址（可能不含端口）
+//	tp: 连接类型（tcp、tls等）
+//
+// 返回:
+//
+//	string: 包含端口的完整地址
 func EnsurePort(server string, tp string) string {
 	_, port, err := net.SplitHostPort(server)
 	if err == nil && port != "" {
@@ -311,7 +398,32 @@ func EnsurePort(server string, tp string) string {
 	return server
 }
 
-// NewConn Create a new connection with the server and verify it
+// NewConn 创建与服务器的连接并进行验证
+// 支持多种连接类型：tcp、tls、ws、wss、quic、kcp
+// 连接后会进行版本协商和身份验证
+//
+// 认证流程（版本>=0.27.0）：
+// 1. 发送测试报文CONN_TEST
+// 2. 发送客户端支持的最小版本
+// 3. 发送客户端当前版本（带随机填充）
+// 4. 发送时间戳和vkey的Blake2b哈希
+// 5. 发送客户端信息（IP、连接类型等，加密）
+// 6. 发送随机数据（1000字节）
+// 7. 计算并发送HMAC签名
+// 8. 接收服务器响应验证版本和证书
+//
+// 参数:
+//
+//	tp: 连接类型（tcp、tls、ws、wss、quic、kcp）
+//	vkey: 客户端验证密钥
+//	server: 服务器地址（格式：host:port 或 host:port/path）
+//	proxyUrl: 代理URL（可选）
+//
+// 返回:
+//
+//	*conn.Conn: 连接对象
+//	string: UUID（连接唯一标识符）
+//	error: 错误信息
 func NewConn(tp string, vkey string, server string, proxyUrl string) (*conn.Conn, string, error) {
 	//logs.Debug("NewConn: %s %s %s %s %s", tp, vkey, server, connType, proxyUrl)
 	var err error
@@ -589,6 +701,18 @@ func NewConn(tp string, vkey string, server string, proxyUrl string) (*conn.Conn
 	return c, uuid, err
 }
 
+// SendType 发送连接类型和UUID到服务器
+// 在发送连接请求前，需要告知服务器工作类型和连接标识
+//
+// 参数:
+//
+//	c: 连接对象
+//	connType: 连接类型（WORK_CONFIG、WORK_REGISTER等）
+//	uuid: 连接的唯一标识符
+//
+// 返回:
+//
+//	error: 错误信息
 func SendType(c *conn.Conn, connType, uuid string) error {
 	if _, err := c.BufferWrite([]byte(connType)); err != nil {
 		_ = c.Close()
@@ -621,6 +745,19 @@ func SendType(c *conn.Conn, connType, uuid string) error {
 	return nil
 }
 
+// GetProxyConn 通过代理建立TCP连接
+// 支持SOCKS5和HTTP代理
+//
+// 参数:
+//
+//	proxyUrl: 代理URL（如：socks5://127.0.0.1:1080）
+//	server: 目标服务器地址
+//	timeout: 连接超时时间
+//
+// 返回:
+//
+//	net.Conn: 网络连接
+//	error: 错误信息
 func GetProxyConn(proxyUrl, server string, timeout time.Duration) (rawConn net.Conn, err error) {
 	if proxyUrl != "" {
 		u, er := url.Parse(proxyUrl)
@@ -649,7 +786,19 @@ func GetProxyConn(proxyUrl, server string, timeout time.Duration) (rawConn net.C
 	return rawConn, nil
 }
 
-// NewHttpProxyConn http proxy connection
+// NewHttpProxyConn 通过HTTP代理建立连接
+// 使用HTTP CONNECT方法建立到目标服务器的隧道连接
+//
+// 参数:
+//
+//	proxyURL: 代理URL
+//	remoteAddr: 目标服务器地址
+//	timeout: 连接超时时间
+//
+// 返回:
+//
+//	net.Conn: 代理连接
+//	error: 错误信息
 func NewHttpProxyConn(proxyURL *url.URL, remoteAddr string, timeout time.Duration) (net.Conn, error) {
 	proxyConn, err := net.DialTimeout("tcp", proxyURL.Host, timeout)
 	if err != nil {

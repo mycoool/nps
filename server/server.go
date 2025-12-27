@@ -1,3 +1,5 @@
+// Package server 提供nps服务器的核心功能
+// 包括服务器启动、任务管理、客户端管理、流量统计等核心业务逻辑
 package server
 
 import (
@@ -32,17 +34,28 @@ import (
 )
 
 var (
-	Bridge         *bridge.Bridge
-	RunList        sync.Map //map[int]interface{}
-	once           sync.Once
+	// Bridge 服务器桥接对象，负责与客户端的通信连接管理
+	Bridge *bridge.Bridge
+	// RunList 运行中的任务列表，key为任务ID，value为服务实例
+	// 使用sync.Map保证并发安全
+	RunList sync.Map //map[int]interface{}
+	// once 用于确保某些初始化操作只执行一次
+	once sync.Once
+	// HttpProxyCache HTTP代理缓存，用于快速查找HTTP代理配置
 	HttpProxyCache = index.NewAnyIntIndex()
 )
 
+// init 包初始化函数
+// 初始化运行列表，并设置工具查找函数
 func init() {
+	// 初始化任务运行列表
 	RunList = sync.Map{}
+	// 设置任务查找回调函数，用于根据任务ID查找对应的拨号器
 	tool.SetLookup(func(id int) (tool.Dialer, bool) {
 		if v, ok := RunList.Load(id); ok {
+			// 类型断言检查是否为隧道模式服务器
 			if svr, ok := v.(*proxy.TunnelModeServer); ok {
+				// 排除tunnel://类型的任务
 				if !strings.Contains(svr.Task.Target.TargetStr, "tunnel://") {
 					return svr, true
 				}
@@ -52,7 +65,11 @@ func init() {
 	})
 }
 
-// InitFromDb init task from db
+// InitFromDb 从数据库初始化任务和客户端
+// 该函数在服务器启动时调用，用于：
+// 1. 创建本地代理客户端（如果启用）
+// 2. 添加公共vkey客户端（如果配置了）
+// 3. 加载所有状态为true的任务并启动
 func InitFromDb() {
 	if allowLocalProxy, _ := beego.AppConfig.Bool("allow_local_proxy"); allowLocalProxy {
 		db := file.GetDb()
@@ -91,7 +108,14 @@ func InitFromDb() {
 	})
 }
 
-// DealBridgeTask get bridge command
+// DealBridgeTask 处理桥接器发送的各种任务命令
+// 这是一个核心的协程函数，通过channel监听并处理以下任务：
+// 1. OpenHost: 打开/修改主机配置，清除HTTP代理缓存
+// 2. OpenTask: 打开/重启任务，停止旧任务后启动新任务
+// 3. CloseTask: 关闭任务
+// 4. CloseClient: 关闭客户端，删除该客户端的所有任务和主机
+// 5. SecretChan: 处理秘密链接连接
+// 该函数会无限循环，持续处理来自bridge的命令
 func DealBridgeTask() {
 	for {
 		select {
@@ -146,7 +170,21 @@ func DealBridgeTask() {
 	}
 }
 
-// StartNewServer start a new server
+// StartNewServer 启动一个新的服务器实例
+// 该函数是nps服务器的核心启动函数，负责：
+// 1. 创建并启动桥接器（Bridge），监听客户端连接
+// 2. 启动P2P服务器（如果配置了p2p_port）
+// 3. 启动桥接任务处理协程（DealBridgeTask）
+// 4. 启动客户端流量统计协程（dealClientFlow）
+// 5. 初始化仪表板数据
+// 6. 根据配置创建并启动对应模式的服务（TCP/UDP/HTTP代理等）
+//
+// 参数:
+//
+//	bridgePort: 桥接器监听端口
+//	cnf: 隧道配置
+//	bridgeType: 桥接类型（tcp/kcp等）
+//	bridgeDisconnect: 断开连接的超时时间
 func StartNewServer(bridgePort int, cnf *file.Tunnel, bridgeType string, bridgeDisconnect int) {
 	Bridge = bridge.NewTunnel(bridgePort, bridgeType, common.GetBoolByStr(beego.AppConfig.String("ip_limit")), &RunList, bridgeDisconnect)
 	go func() {
@@ -184,6 +222,8 @@ func StartNewServer(bridgePort int, cnf *file.Tunnel, bridgeType string, bridgeD
 	}
 }
 
+// dealClientFlow 客户端流量统计协程
+// 每分钟触发一次，调用dealClientData()处理客户端数据更新
 func dealClientFlow() {
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
@@ -192,24 +232,59 @@ func dealClientFlow() {
 	}
 }
 
+// PingClient 向客户端发送ping请求，测量往返时间（RTT）
+// 通过向指定客户端发送ping连接请求，计算并返回往返延迟时间（毫秒）
+//
+// 参数:
+//
+//	id: 客户端ID
+//	addr: 客户端地址
+//
+// 返回:
+//
+//	int: 往返时间（毫秒），失败返回-1，无效ID返回0
 func PingClient(id int, addr string) int {
 	if id <= 0 {
 		return 0
 	}
+	// 创建ping类型的连接
 	link := conn.NewLink("ping", "", false, false, addr, false)
 	link.Option.NeedAck = true
 	start := time.Now()
+	// 通过bridge向客户端发送连接信息
 	target, err := Bridge.SendLinkInfo(id, link, nil)
 	if err != nil {
 		logs.Warn("get connection from client Id %d error %v", id, err)
 		return -1
 	}
+	// 计算往返时间
 	rtt := int(time.Since(start).Milliseconds())
 	_ = target.Close()
 	return rtt
 }
 
-// NewMode new a server by mode name
+// NewMode 根据模式名称创建对应的服务器实例
+// nps支持多种隧道和代理模式，该函数根据配置的模式创建相应的服务对象
+//
+// 支持的模式:
+//   - tcp: TCP隧道模式
+//   - file: 文件服务模式
+//   - mixProxy: 混合代理模式（HTTP+SOCKS5）
+//   - socks5: SOCKS5代理模式
+//   - httpProxy: HTTP代理模式
+//   - tcpTrans: TCP透传模式
+//   - udp: UDP隧道模式
+//   - webServer: Web服务器模式（管理界面）
+//   - httpHostServer: HTTP虚拟主机模式
+//
+// 参数:
+//
+//	Bridge: 桥接器对象
+//	c: 隧道配置
+//
+// 返回:
+//
+//	proxy.Service: 代理服务实例
 func NewMode(Bridge *bridge.Bridge, c *file.Tunnel) proxy.Service {
 	var service proxy.Service
 	allowLocalProxy := beego.AppConfig.DefaultBool("allow_local_proxy", false)
@@ -246,7 +321,19 @@ func NewMode(Bridge *bridge.Bridge, c *file.Tunnel) proxy.Service {
 	return service
 }
 
-// StopServer stop server
+// StopServer 停止指定ID的服务器
+// 该函数会：
+// 1. 更新数据库中任务的状态为false
+// 2. 调用服务实例的Close方法停止服务
+// 3. 从运行列表中移除该任务
+//
+// 参数:
+//
+//	id: 任务ID
+//
+// 返回:
+//
+//	error: 错误信息，nil表示成功
 func StopServer(id int) error {
 	if t, err := file.GetDb().GetTask(id); err != nil {
 		return err
@@ -272,7 +359,20 @@ func StopServer(id int) error {
 	return errors.New("task is not running")
 }
 
-// AddTask add task
+// AddTask 添加并启动一个新的任务
+// 该函数负责：
+// 1. 检查端口是否可用
+// 2. 创建流量存储定时器（如果配置了）
+// 3. 根据模式创建相应的服务实例
+// 4. 启动服务并加入到运行列表
+//
+// 参数:
+//
+//	t: 隧道任务配置
+//
+// 返回:
+//
+//	error: 错误信息，nil表示成功
 func AddTask(t *file.Tunnel) error {
 	if t.Mode == "secret" || t.Mode == "p2p" {
 		logs.Info("secret task %s start ", t.Remark)
@@ -305,7 +405,16 @@ func AddTask(t *file.Tunnel) error {
 	return nil
 }
 
-// StartTask start task
+// StartTask 启动指定ID的任务
+// 从数据库获取任务配置，检查端口可用性后调用AddTask启动
+//
+// 参数:
+//
+//	id: 任务ID
+//
+// 返回:
+//
+//	error: 错误信息，nil表示成功
 func StartTask(id int) error {
 	if t, err := file.GetDb().GetTask(id); err != nil {
 		return err
@@ -323,7 +432,16 @@ func StartTask(id int) error {
 	return nil
 }
 
-// DelTask delete task
+// DelTask 删除指定ID的任务
+// 先停止任务运行，然后从数据库中删除
+//
+// 参数:
+//
+//	id: 任务ID
+//
+// 返回:
+//
+//	error: 错误信息，nil表示成功
 func DelTask(id int) error {
 	//if _, ok := RunList[id]; ok {
 	if _, ok := RunList.Load(id); ok {
@@ -334,7 +452,23 @@ func DelTask(id int) error {
 	return file.GetDb().DelTask(id)
 }
 
-// GetTunnel get task list by page num
+// GetTunnel 分页获取任务列表
+// 支持按类型、客户端ID、关键字过滤，以及多字段排序
+//
+// 参数:
+//
+//	start: 起始位置（分页）
+//	length: 每页数量，0表示全部
+//	typeVal: 任务类型过滤（tcp、udp、socks5等）
+//	clientId: 客户端ID过滤，0表示不限制
+//	search: 搜索关键字（匹配ID、端口、密码、备注、目标地址）
+//	sortField: 排序字段（Id、Port、Remark、Client.Id等）
+//	order: 排序方式（asc升序、desc降序）
+//
+// 返回:
+//
+//	[]*file.Tunnel: 任务列表
+//	int: 总数量
 func GetTunnel(start, length int, typeVal string, clientId int, search string, sortField string, order string) ([]*file.Tunnel, int) {
 	allList := make([]*file.Tunnel, 0) //store all Tunnel
 	list := make([]*file.Tunnel, 0)
@@ -544,7 +678,22 @@ func GetTunnel(start, length int, typeVal string, clientId int, search string, s
 	return list, cnt
 }
 
-// GetHostList get client list
+// GetHostList 分页获取主机列表
+// 支持按客户端ID、关键字过滤，以及多字段排序
+//
+// 参数:
+//
+//	start: 起始位置（分页）
+//	length: 每页数量
+//	clientId: 客户端ID过滤，0表示不限制
+//	search: 搜索关键字（匹配ID、主机名、备注、客户端vkey）
+//	sortField: 排序字段（Id、Host、Remark、Scheme等）
+//	order: 排序方式（asc升序、desc降序）
+//
+// 返回:
+//
+//	[]*file.Host: 主机列表
+//	int: 总数量
 func GetHostList(start, length, clientId int, search, sortField, order string) (list []*file.Host, cnt int) {
 	list, cnt = file.GetDb().GetHost(start, length, clientId, search)
 	//sort by Id, Remark..., asc or desc
@@ -732,7 +881,22 @@ func GetHostList(start, length, clientId int, search, sortField, order string) (
 	return
 }
 
-// GetClientList get client list
+// GetClientList 分页获取客户端列表
+// 支持按关键字、客户端ID过滤，以及多字段排序
+//
+// 参数:
+//
+//	start: 起始位置（分页）
+//	length: 每页数量
+//	search: 搜索关键字（匹配ID、vkey、备注）
+//	sortField: 排序字段（Id、Addr、Remark、VerifyKey、Version、NowConn等）
+//	order: 排序方式（asc升序、desc降序）
+//	clientId: 客户端ID过滤，0表示不限制
+//
+// 返回:
+//
+//	[]*file.Client: 客户端列表
+//	int: 总数量
 func GetClientList(start, length int, search, sortField, order string, clientId int) (list []*file.Client, cnt int) {
 	list, cnt = file.GetDb().GetClientList(start, length, search, sortField, order, clientId)
 	//sort by Id, Remark, Port..., asc or desc
@@ -855,6 +1019,13 @@ func GetClientList(start, length int, search, sortField, order string, clientId 
 	return
 }
 
+// dealClientData 处理和更新客户端数据
+// 该函数负责：
+// 1. 更新客户端的连接状态（IsConnect）
+// 2. 更新客户端的最后在线时间
+// 3. 获取并更新客户端版本信息
+// 4. 统计每个客户端的流量（InletFlow和ExportFlow）
+// 注意：该函数会先清空所有客户端的InletFlow和ExportFlow，然后从Hosts和Tasks中重新统计
 func dealClientData() {
 	//logs.Info("dealClientData.........")
 	file.GetDb().JsonDb.Clients.Range(func(key, value interface{}) bool {
@@ -916,7 +1087,14 @@ func dealClientData() {
 	})
 }
 
-// DelTunnelAndHostByClientId delete all host and tasks by client id
+// DelTunnelAndHostByClientId 根据客户端ID删除所有关联的任务和主机
+//
+// 参数:
+//
+//	clientId: 客户端ID
+//	justDelNoStore: 是否仅删除NoStore为true的项
+//	                 false: 删除该客户端的所有任务和主机
+//	                 true: 仅删除不持久化的任务和主机
 func DelTunnelAndHostByClientId(clientId int, justDelNoStore bool) {
 	var ids []int
 	file.GetDb().JsonDb.Tasks.Range(func(key, value interface{}) bool {
@@ -949,7 +1127,12 @@ func DelTunnelAndHostByClientId(clientId int, justDelNoStore bool) {
 	}
 }
 
-// DelClientConnect close the client
+// DelClientConnect 关闭指定客户端的连接
+// 从bridge中移除客户端连接，断开该客户端与服务器的连接
+//
+// 参数:
+//
+//	clientId: 客户端ID
 func DelClientConnect(clientId int) {
 	Bridge.DelClient(clientId)
 }
@@ -970,14 +1153,19 @@ var (
 	ioRecvRate     atomic.Value // float64
 )
 
+// startSpeedSampler 启动网络IO速率采样器
+// 通过定时采样网络IO计数器，计算发送和接收速率（字节/秒）
+// 使用samplerOnce确保只启动一次采样协程
 func startSpeedSampler() {
 	samplerOnce.Do(func() {
+		// 初始化初始值
 		if io1, _ := net.IOCounters(false); len(io1) > 0 {
 			lastBytesSent = io1[0].BytesSent
 			lastBytesRecv = io1[0].BytesRecv
 		}
 		lastSampleTime = time.Now()
 
+		// 启动采样协程
 		go func() {
 			ticker := time.NewTicker(time.Second)
 			defer ticker.Stop()
@@ -987,13 +1175,14 @@ func startSpeedSampler() {
 					recv := io2[0].BytesRecv
 					elapsed := now.Sub(lastSampleTime).Seconds()
 
-					// calculate bytes/sec
+					// 计算速率（字节/秒）
 					rateSent := float64(sent-lastBytesSent) / elapsed
 					rateRecv := float64(recv-lastBytesRecv) / elapsed
 
 					ioSendRate.Store(rateSent)
 					ioRecvRate.Store(rateRecv)
 
+					// 更新采样点
 					lastBytesSent = sent
 					lastBytesRecv = recv
 					lastSampleTime = now
@@ -1003,11 +1192,23 @@ func startSpeedSampler() {
 	})
 }
 
+// InitDashboardData 初始化仪表板数据
+// 启动速率采样器并获取初始数据
 func InitDashboardData() {
 	startSpeedSampler()
 	GetDashboardData(true)
 }
 
+// GetDashboardData 获取仪表板显示数据
+// 包含服务器的各种统计信息：客户端数量、主机数量、流量统计、系统资源使用率等
+//
+// 参数:
+//
+//	force: 是否强制刷新完整数据
+//
+// 返回:
+//
+//	map[string]interface{}: 包含各种统计指标的map
 func GetDashboardData(force bool) map[string]interface{} {
 	cacheMu.RLock()
 	cached := dashboardCache
@@ -1270,23 +1471,36 @@ func GetDashboardData(force bool) map[string]interface{} {
 	return data
 }
 
+// GetVersion 获取当前服务器版本
 func GetVersion() string {
 	return version.VERSION
 }
 
+// GetMinVersion 获取支持的最低客户端版本
+// 根据服务器安全模式确定最低兼容版本
 func GetMinVersion() string {
 	return version.GetMinVersion(bridge.ServerSecureMode)
 }
 
+// GetCurrentYear 获取当前年份
 func GetCurrentYear() int {
 	return time.Now().Year()
 }
 
+// flowSession 流量数据持久化定时器
+// 将数据库中的Hosts、Tasks、Clients、Global数据定期保存到JSON文件
+// 使用once确保定时器只启动一次
+//
+// 参数:
+//
+//	m: 定时间隔
 func flowSession(m time.Duration) {
+	// 立即保存一次
 	file.GetDb().JsonDb.StoreHostToJsonFile()
 	file.GetDb().JsonDb.StoreTasksToJsonFile()
 	file.GetDb().JsonDb.StoreClientsToJsonFile()
 	file.GetDb().JsonDb.StoreGlobalToJsonFile()
+	// 启动定时保存协程
 	once.Do(func() {
 		go func() {
 			ticker := time.NewTicker(m)

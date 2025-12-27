@@ -20,6 +20,16 @@ type basePackager struct {
 	content []byte
 }
 
+// Set 设置数据包内容
+// 将内容复制到缓冲区或content字段
+//
+// 参数:
+//
+//	content: 待设置的数据内容
+//
+// 返回:
+//
+//	error: 错误信息（内容过大或缓冲区太小）
 func (Self *basePackager) Set(content []byte) (err error) {
 	Self.reset()
 
@@ -52,6 +62,13 @@ func (Self *basePackager) Set(content []byte) (err error) {
 	return
 }
 
+// GetContent 获取数据包内容
+// 从缓冲区或content字段中读取数据
+//
+// 返回:
+//
+//	[]byte: 数据内容
+//	error: 错误信息（内容为空时返回错误）
 func (Self *basePackager) GetContent() (content []byte, err error) {
 	if Self.length == 0 || (Self.content == nil && Self.buf == nil) {
 		return nil, errors.New("mux:packer:content is nil")
@@ -62,6 +79,16 @@ func (Self *basePackager) GetContent() (content []byte, err error) {
 	return Self.content[:Self.length], nil
 }
 
+// Pack 将数据包序列化为二进制并写入到输出流
+// 写入格式：[length(2字节)] + [content(length字节)]
+//
+// 参数:
+//
+//	writer: 输出流（如网络连接）
+//
+// 返回:
+//
+//	error: 写入错误
 func (Self *basePackager) Pack(writer io.Writer) (err error) {
 	binary.LittleEndian.PutUint16(Self.buf[5:7], Self.length)
 	if Self.content == nil {
@@ -76,6 +103,17 @@ func (Self *basePackager) Pack(writer io.Writer) (err error) {
 	return
 }
 
+// UnPack 从输入流读取并解析数据包
+// 读取格式：[length(2字节)] + [content(length字节)]
+//
+// 参数:
+//
+//	reader: 输入流（如网络连接）
+//
+// 返回:
+//
+//	uint16: 读取的总字节数
+//	error: 读取错误
 func (Self *basePackager) UnPack(reader io.Reader) (n uint16, err error) {
 	Self.reset()
 	l, err := io.ReadFull(reader, Self.buf[5:7])
@@ -108,20 +146,36 @@ func (Self *basePackager) UnPack(reader io.Reader) (n uint16, err error) {
 	return
 }
 
+// reset 重置数据包状态
+// 清空长度和内容，准备下一次使用
 func (Self *basePackager) reset() {
 	Self.length = 0
 	//Self.content = nil
 	//Self.buf = nil
 }
 
+// muxPackager MUX协议的数据包处理器
+// 支持多种消息类型和流量控制机制
 type muxPackager struct {
-	flag     uint8
-	id       int32
-	window   uint64
-	priority bool
-	basePackager
+	flag         uint8  // 消息类型标志（muxPingFlag、muxNewMsg等）
+	id           int32  // 消息ID
+	window       uint64 // 流控窗口大小
+	priority     bool   // 是否为高优先级消息
+	basePackager        // 继承基础数据包处理器
 }
 
+// Set 设置MUX数据包内容
+// 根据消息类型设置不同的内容格式
+//
+// 参数:
+//
+//	flag: 消息类型标志
+//	id: 消息ID
+//	content: 消息内容（类型根据flag而不同）
+//
+// 返回:
+//
+//	error: 错误信息
 func (Self *muxPackager) Set(flag uint8, id int32, content interface{}) (err error) {
 	Self.buf = windowBuff.Get()
 	Self.flag = flag
@@ -140,6 +194,18 @@ func (Self *muxPackager) Set(flag uint8, id int32, content interface{}) (err err
 	return
 }
 
+// Pack 将MUX数据包序列化为二进制并写入到输出流
+// 写入格式根据消息类型而不同：
+// - 普通消息：[flag(1)] + [id(4)] + [length(2)] + [content(length)]
+// - 流控消息：[flag(1)] + [id(4)] + [window(8)]
+//
+// 参数:
+//
+//	writer: 输出流
+//
+// 返回:
+//
+//	error: 写入错误
 func (Self *muxPackager) Pack(writer io.Writer) (err error) {
 	//Self.buf = Self.buf[0:13]
 	Self.buf[0] = Self.flag
@@ -162,6 +228,17 @@ func (Self *muxPackager) Pack(writer io.Writer) (err error) {
 	return
 }
 
+// UnPack 从输入流读取并解析MUX数据包
+// 根据消息类型读取不同的内容格式
+//
+// 参数:
+//
+//	reader: 输入流
+//
+// 返回:
+//
+//	uint16: 读取的总字节数
+//	error: 读取错误
 func (Self *muxPackager) UnPack(reader io.Reader) (n uint16, err error) {
 	Self.buf = windowBuff.Get()
 	//Self.buf = Self.buf[0:13]
@@ -193,6 +270,9 @@ func (Self *muxPackager) UnPack(reader io.Reader) (n uint16, err error) {
 	return
 }
 
+// reset 重置MUX数据包状态
+// 清空所有字段，准备下一次使用
+// 归还缓冲区到对象池
 func (Self *muxPackager) reset() {
 	Self.id = 0
 	Self.flag = 0

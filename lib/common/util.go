@@ -1,3 +1,5 @@
+// Package common 提供各种通用工具函数
+// 包括网络、加密、时间、文件、字符串处理等工具
 package common
 
 import (
@@ -30,8 +32,17 @@ import (
 	"github.com/mycoool/nps/lib/logs"
 )
 
-// ExtractHost
-// return "[2001:db8::1]:80"
+// ExtractHost 从输入字符串中提取主机地址（包含端口）
+// 支持URL格式和纯地址格式
+// 示例:
+//
+//	"https://example.com/path" -> "example.com"
+//	"192.168.1.1:8080" -> "192.168.1.1:8080"
+//	"[2001:db8::1]:80" -> "[2001:db8::1]:80"
+//
+// 返回:
+//
+//	string: 包含端口的主机地址
 func ExtractHost(input string) string {
 	if strings.Contains(input, "://") {
 		if u, err := url.Parse(input); err == nil && u.Host != "" {
@@ -44,8 +55,16 @@ func ExtractHost(input string) string {
 	return input
 }
 
-// RemovePortFromHost
-// return "[2001:db8::1]"
+// RemovePortFromHost 从主机地址中移除端口号
+// 正确处理IPv6地址的方括号
+// 示例:
+//
+//	"192.168.1.1:8080" -> "192.168.1.1"
+//	"[2001:db8::1]:80" -> "[2001:db8::1]"
+//
+// 返回:
+//
+//	string: 不包含端口的主机地址
 func RemovePortFromHost(host string) string {
 	if len(host) == 0 {
 		return host
@@ -65,8 +84,16 @@ func RemovePortFromHost(host string) string {
 	return host
 }
 
-// GetIpByAddr
-// return "2001:db8::1"
+// GetIpByAddr 从地址中提取纯IP地址
+// 移除IPv6的方括号和端口号
+// 示例:
+//
+//	"192.168.1.1:8080" -> "192.168.1.1"
+//	"[2001:db8::1]:80" -> "2001:db8::1"
+//
+// 返回:
+//
+//	string: 纯IP地址
 func GetIpByAddr(host string) string {
 	if len(host) == 0 {
 		return host
@@ -86,12 +113,30 @@ func GetIpByAddr(host string) string {
 	return host
 }
 
+// IsDomain 判断字符串是否为域名
+// 如果能解析为IP地址则返回false
+//
+// 参数:
+//
+//	s: 待判断的字符串
+//
+// 返回:
+//
+//	bool: true表示是域名
 func IsDomain(s string) bool {
 	return net.ParseIP(s) == nil
 }
 
-// GetPortByAddr
-// return int or 0
+// GetPortByAddr 从地址中提取端口号
+// 正确处理IPv6地址的方括号
+// 示例:
+//
+//	"192.168.1.1:8080" -> 8080
+//	"[2001:db8::1]:443" -> 443
+//
+// 返回:
+//
+//	int: 端口号，无效返回0
 func GetPortByAddr(addr string) int {
 	if len(addr) == 0 {
 		return 0
@@ -116,6 +161,11 @@ func GetPortByAddr(addr string) int {
 	return 0
 }
 
+// GetPortStrByAddr 从地址中提取端口号（字符串格式）
+//
+// 返回:
+//
+//	string: 端口号字符串，无效返回空字符串
 func GetPortStrByAddr(addr string) string {
 	port := GetPortByAddr(addr)
 	if port == 0 {
@@ -124,6 +174,16 @@ func GetPortStrByAddr(addr string) string {
 	return strconv.Itoa(port)
 }
 
+// ValidateAddr 验证地址格式是否正确
+// 检查IP和端口是否有效
+//
+// 参数:
+//
+//	s: 待验证的地址
+//
+// 返回:
+//
+//	string: 验证通过返回原地址，否则返回空字符串
 func ValidateAddr(s string) string {
 	host, port, err := net.SplitHostPort(s)
 	if err != nil {
@@ -139,6 +199,21 @@ func ValidateAddr(s string) string {
 	return s
 }
 
+// BuildAddress 构建完整的地址字符串
+// 正确处理IPv6地址的方括号
+// 示例:
+//
+//	"192.168.1.1", "8080" -> "192.168.1.1:8080"
+//	"2001:db8::1", "80" -> "[2001:db8::1]:80"
+//
+// 参数:
+//
+//	host: 主机或IP
+//	port: 端口号
+//
+// 返回:
+//
+//	string: 完整的地址
 func BuildAddress(host string, port string) string {
 	if strings.Contains(host, ":") { // IPv6
 		return fmt.Sprintf("[%s]:%s", host, port)
@@ -146,6 +221,20 @@ func BuildAddress(host string, port string) string {
 	return fmt.Sprintf("%s:%s", host, port)
 }
 
+// SplitServerAndPath 分割服务器地址和路径
+// 示例:
+//
+//	"example.com/path" -> "example.com", "/path"
+//	"example.com" -> "example.com", ""
+//
+// 参数:
+//
+//	s: 完整地址
+//
+// 返回:
+//
+//	string: 服务器地址
+//	string: 路径
 func SplitServerAndPath(s string) (server, path string) {
 	index := strings.Index(s, "/")
 	if index == -1 {
@@ -154,6 +243,22 @@ func SplitServerAndPath(s string) (server, path string) {
 	return s[:index], s[index:]
 }
 
+// SplitAddrAndHost 分割地址、主机名和SNI
+// 支持格式：addr@host，如果host为空则使用addr
+// 示例:
+//
+//	"1.2.3.4:443@example.com" -> "1.2.3.4:443", "example.com", "example.com"
+//	"example.com:443" -> "example.com:443", "example.com", "example.com"
+//
+// 参数:
+//
+//	s: 完整地址
+//
+// 返回:
+//
+//	string: 连接地址
+//	string: 主机名
+//	string: SNI（如果host是IP则返回空）
 func SplitAddrAndHost(s string) (addr, host, sni string) {
 	s = strings.TrimSpace(s)
 	index := strings.Index(s, "@")
@@ -168,6 +273,16 @@ func SplitAddrAndHost(s string) (addr, host, sni string) {
 	return addr, host, GetSni(host)
 }
 
+// GetSni 从主机名中获取SNI（Server Name Indication）
+// SNI只在域名时使用，IP地址时不使用
+//
+// 参数:
+//
+//	host: 主机名或IP
+//
+// 返回:
+//
+//	string: SNI，IP地址返回空字符串
 func GetSni(host string) string {
 	sni := GetIpByAddr(host)
 	if !IsDomain(sni) {
@@ -182,15 +297,13 @@ func GetHostByName(hostname string) string {
 		return hostname
 	}
 	ips, _ := net.LookupIP(hostname)
-	if ips != nil {
-		for _, v := range ips {
-			if v.To4() != nil {
-				return v.String()
-			}
-			// If IPv4 not found, return IPv6
-			if v.To16() != nil {
-				return v.String()
-			}
+	for _, v := range ips {
+		if v.To4() != nil {
+			return v.String()
+		}
+		// If IPv4 not found, return IPv6
+		if v.To16() != nil {
+			return v.String()
 		}
 	}
 	return ""
@@ -235,16 +348,25 @@ func GetPort(value int) int {
 	return (65536 + value%65536) % 65536
 }
 
-// CheckAuthWithAccountMap
-// u current login user
-// p current login passwd
-// user global user
-// passwd global passwd
-// accountMap enable multi user auth
+// CheckAuthWithAccountMap 检查用户认证信息
+// 支持单账号、多账号、authMap三种认证方式
+//
+// 参数:
+//
+//	u: 当前登录用户名
+//	p: 当前登录密码
+//	user: 全局用户名
+//	passwd: 全局密码
+//	accountMap: 多账号映射表（username->password）
+//	authMap: auth映射表（username->password）
+//
+// 返回:
+//
+//	bool: true表示认证成功
 func CheckAuthWithAccountMap(u, p, user, passwd string, accountMap, authMap map[string]string) bool {
 	// Single account check
-	noAccountMap := accountMap == nil || len(accountMap) == 0
-	noAuthMap := authMap == nil || len(authMap) == 0
+	noAccountMap := len(accountMap) == 0
+	noAuthMap := len(authMap) == 0
 	if noAccountMap && noAuthMap {
 		return u == user && p == passwd
 	}
@@ -276,7 +398,7 @@ func CheckAuthWithAccountMap(u, p, user, passwd string, accountMap, authMap map[
 // CheckAuth Check if the Request request is validated
 func CheckAuth(r *http.Request, user, passwd string, accountMap, authMap map[string]string) bool {
 	// Bypass authentication only if user, passwd are empty and multiAccount is nil or empty
-	if user == "" && passwd == "" && (accountMap == nil || len(accountMap) == 0) && (authMap == nil || len(authMap) == 0) {
+	if user == "" && passwd == "" && len(accountMap) == 0 && len(authMap) == 0 {
 		return true
 	}
 
@@ -301,6 +423,16 @@ func CheckAuth(r *http.Request, user, passwd string, accountMap, authMap map[str
 	return CheckAuthWithAccountMap(pair[0], pair[1], user, passwd, accountMap, authMap)
 }
 
+// DealMultiUser 解析多用户配置字符串
+// 支持换行符分隔的配置格式：username=password
+//
+// 参数:
+//
+//	s: 多用户配置字符串
+//
+// 返回:
+//
+//	map[string]string: 用户名->密码的映射
 func DealMultiUser(s string) map[string]string {
 	s = strings.TrimSpace(s)
 	if s == "" {
@@ -324,7 +456,15 @@ func DealMultiUser(s string) map[string]string {
 	return multiUserMap
 }
 
-// GetBoolByStr get bool by str
+// GetBoolByStr 将字符串转换为布尔值
+//
+// 参数:
+//
+//	s: 待转换的字符串
+//
+// 返回:
+//
+//	bool: "1"或"true"返回true，其他返回false
 func GetBoolByStr(s string) bool {
 	switch s {
 	case "1", "true":
@@ -333,7 +473,15 @@ func GetBoolByStr(s string) bool {
 	return false
 }
 
-// GetStrByBool get str by bool
+// GetStrByBool 将布尔值转换为字符串
+//
+// 参数:
+//
+//	b: 布尔值
+//
+// 返回:
+//
+//	string: true返回"1"，false返回"0"
 func GetStrByBool(b bool) string {
 	if b {
 		return "1"
@@ -341,13 +489,30 @@ func GetStrByBool(b bool) string {
 	return "0"
 }
 
-// GetIntNoErrByStr int
+// GetIntNoErrByStr 将字符串转换为整数（忽略错误）
+//
+// 参数:
+//
+//	str: 待转换的字符串
+//
+// 返回:
+//
+//	int: 整数值，转换失败返回0
 func GetIntNoErrByStr(str string) int {
 	i, _ := strconv.Atoi(strings.TrimSpace(str))
 	return i
 }
 
-// GetTimeNoErrByStr time
+// GetTimeNoErrByStr 将字符串转换为时间对象（忽略错误）
+// 支持Unix时间戳（秒或毫秒）和日期字符串
+//
+// 参数:
+//
+//	str: 待转换的字符串
+//
+// 返回:
+//
+//	time.Time: 时间对象，解析失败返回零时间
 func GetTimeNoErrByStr(str string) time.Time {
 	// 1. 去除前后空格
 	str = strings.TrimSpace(str)
@@ -375,11 +540,30 @@ func GetTimeNoErrByStr(str string) time.Time {
 	return time.Time{}
 }
 
+// ContainsFold 不区分大小写检查子串
+//
+// 参数:
+//
+//	s: 原字符串
+//	substr: 待查找的子串
+//
+// 返回:
+//
+//	bool: true表示包含
 func ContainsFold(s, substr string) bool {
 	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
 }
 
-// ReadAllFromFile Read file content by file path
+// ReadAllFromFile 读取文件的全部内容
+//
+// 参数:
+//
+//	filePath: 文件路径
+//
+// 返回:
+//
+//	[]byte: 文件内容
+//	error: 错误信息
 func ReadAllFromFile(filePath string) ([]byte, error) {
 	f, err := os.Open(filePath)
 	if err != nil {
@@ -389,6 +573,16 @@ func ReadAllFromFile(filePath string) ([]byte, error) {
 	return io.ReadAll(f)
 }
 
+// GetPath 获取文件的绝对路径
+// 如果是相对路径则转换为绝对路径
+//
+// 参数:
+//
+//	filePath: 文件路径
+//
+// 返回:
+//
+//	string: 绝对路径
 func GetPath(filePath string) string {
 	if !filepath.IsAbs(filePath) {
 		filePath = filepath.Join(GetRunPath(), filePath)
@@ -400,6 +594,18 @@ func GetPath(filePath string) string {
 	return path
 }
 
+// GetCertContent 读取证书文件内容
+// 如果文件路径已经包含header标记则直接返回
+//
+// 参数:
+//
+//	filePath: 证书文件路径或内容
+//	header: 证书标记（如"CERTIFICATE"）
+//
+// 返回:
+//
+//	string: 证书内容
+//	error: 错误信息
 func GetCertContent(filePath, header string) (string, error) {
 	if filePath == "" || strings.Contains(filePath, header) {
 		return filePath, nil
@@ -414,6 +620,18 @@ func GetCertContent(filePath, header string) (string, error) {
 	return string(content), nil
 }
 
+// LoadCertPair 并发加载证书和私钥文件
+//
+// 参数:
+//
+//	certFile: 证书文件路径
+//	keyFile: 私钥文件路径
+//
+// 返回:
+//
+//	string: 证书内容
+//	string: 私钥内容
+//	bool: true表示加载成功
 func LoadCertPair(certFile, keyFile string) (certContent, keyContent string, ok bool) {
 	var wg sync.WaitGroup
 	var certErr, keyErr error
@@ -435,6 +653,17 @@ func LoadCertPair(certFile, keyFile string) (certContent, keyContent string, ok 
 	return certContent, keyContent, true
 }
 
+// LoadCert 加载TLS证书对
+//
+// 参数:
+//
+//	certFile: 证书文件路径
+//	keyFile: 私钥文件路径
+//
+// 返回:
+//
+//	tls.Certificate: TLS证书对象
+//	bool: true表示加载成功
 func LoadCert(certFile, keyFile string) (tls.Certificate, bool) {
 	certContent, keyContent, ok := LoadCertPair(certFile, keyFile)
 	if ok {
@@ -446,6 +675,15 @@ func LoadCert(certFile, keyFile string) (tls.Certificate, bool) {
 	return tls.Certificate{}, false
 }
 
+// GetCertType 获取证书类型
+//
+// 参数:
+//
+//	s: 证书路径或内容
+//
+// 返回:
+//
+//	string: 类型："empty"、"text"、"file"、"invalid"
 func GetCertType(s string) string {
 	if s == "" {
 		return "empty"
@@ -497,16 +735,29 @@ func TestUdpPort(port int) bool {
 	return true
 }
 
-// BinaryWrite Write length and individual byte data
-// Length prevents sticking
-// # Characters are used to separate data
+// BinaryWrite 写入长度和字节数据
+// 使用长度前缀避免粘包问题
+// 使用CONN_DATA_SEQ字符分隔数据
+//
+// 参数:
+//
+//	raw: 写入缓冲区
+//	v: 待写入的字符串列表
 func BinaryWrite(raw *bytes.Buffer, v ...string) {
 	b := GetWriteStr(v...)
 	_ = binary.Write(raw, binary.LittleEndian, int32(len(b)))
 	_ = binary.Write(raw, binary.LittleEndian, b)
 }
 
-// GetWriteStr get seq str
+// GetWriteStr 获取带分隔符的序列化字符串
+//
+// 参数:
+//
+//	v: 待序列化的字符串列表
+//
+// 返回:
+//
+//	[]byte: 序列化后的字节数组
 func GetWriteStr(v ...string) []byte {
 	buffer := new(bytes.Buffer)
 	var l int32
@@ -518,7 +769,16 @@ func GetWriteStr(v ...string) []byte {
 	return buffer.Bytes()
 }
 
-// InStrArr inArray str interface
+// InStrArr 检查字符串是否在数组中
+//
+// 参数:
+//
+//	arr: 字符串数组
+//	val: 待查找的字符串
+//
+// 返回:
+//
+//	bool: true表示存在
 func InStrArr(arr []string, val string) bool {
 	for _, v := range arr {
 		if v == val {
@@ -528,7 +788,16 @@ func InStrArr(arr []string, val string) bool {
 	return false
 }
 
-// InIntArr inArray int interface
+// InIntArr 检查整数是否在数组中
+//
+// 参数:
+//
+//	arr: 整数数组
+//	val: 待查找的整数
+//
+// 返回:
+//
+//	bool: true表示存在
 func InIntArr(arr []int, val int) bool {
 	for _, v := range arr {
 		if v == val {
@@ -538,7 +807,16 @@ func InIntArr(arr []int, val int) bool {
 	return false
 }
 
-// GetPorts format ports str to an int array
+// GetPorts 将端口字符串转换为整数数组
+// 支持逗号分隔和范围格式（如：80,443,1000-2000）
+//
+// 参数:
+//
+//	s: 端口字符串
+//
+// 返回:
+//
+//	[]int: 排序后的端口数组
 func GetPorts(s string) []int {
 	if strings.TrimSpace(s) == "" {
 		return nil
@@ -608,6 +886,17 @@ func in(target string, strArray []string) bool {
 	return false
 }
 
+// IsBlackIp 检查IP是否在黑名单中
+//
+// 参数:
+//
+//	ipPort: IP:Port格式的地址
+//	vkey: 客户端vkey（用于日志）
+//	blackIpList: 黑名单列表
+//
+// 返回:
+//
+//	bool: true表示在黑名单中
 func IsBlackIp(ipPort, vkey string, blackIpList []string) bool {
 	ip := GetIpByAddr(ipPort)
 	if in(ip, blackIpList) {
@@ -617,6 +906,19 @@ func IsBlackIp(ipPort, vkey string, blackIpList []string) bool {
 	return false
 }
 
+// CopyBuffer 在两个读写器之间复制数据
+// 使用CopyBuff池中的缓冲区提高性能
+//
+// 参数:
+//
+//	dst: 目标写入器
+//	src: 源读取器
+//	label: 可选的标签参数（用于调试）
+//
+// 返回:
+//
+//	int64: 写入的字节数
+//	error: 错误信息
 func CopyBuffer(dst io.Writer, src io.Reader, label ...string) (written int64, err error) {
 	buf := CopyBuff.Get()
 	defer CopyBuff.Put(buf)
@@ -647,7 +949,13 @@ func CopyBuffer(dst io.Writer, src io.Reader, label ...string) (written int64, e
 	return written, err
 }
 
-// GetLocalUdpAddr send this ip forget to get a local udp port
+// GetLocalUdpAddr 获取本地UDP地址
+// 通过向自定义DNS服务器发送UDP包来获取本地IP
+//
+// 返回:
+//
+//	net.Conn: UDP连接（会立即关闭）
+//	error: 错误信息
 func GetLocalUdpAddr() (net.Conn, error) {
 	tmpConn, err := net.Dial("udp", GetCustomDNS())
 	if err != nil {
@@ -672,7 +980,17 @@ func GetLocalUdp6Addr() (net.Conn, error) {
 	return tmpConn, tmpConn.Close()
 }
 
-// ParseStr parse template
+// ParseStr 解析模板字符串
+// 使用Go模板语法，支持环境变量替换
+//
+// 参数:
+//
+//	str: 模板字符串（如：{{.USER}}）
+//
+// 返回:
+//
+//	string: 解析后的字符串
+//	error: 错误信息
 func ParseStr(str string) (string, error) {
 	tmp := template.New("npc")
 	var err error
@@ -686,7 +1004,11 @@ func ParseStr(str string) (string, error) {
 	return w.String(), nil
 }
 
-// GetEnvMap get env
+// GetEnvMap 获取所有环境变量
+//
+// 返回:
+//
+//	map[string]string: 环境变量名->值的映射
 func GetEnvMap() map[string]string {
 	m := make(map[string]string)
 	environ := os.Environ()
@@ -711,6 +1033,16 @@ func TrimArr(arr []string) []string {
 	return newArr
 }
 
+// IsArrContains 检查数组是否包含指定值
+//
+// 参数:
+//
+//	arr: 字符串数组
+//	val: 待查找的值
+//
+// 返回:
+//
+//	bool: true表示包含
 func IsArrContains(arr []string, val string) bool {
 	if arr == nil {
 		return false
@@ -723,7 +1055,16 @@ func IsArrContains(arr []string, val string) bool {
 	return false
 }
 
-// RemoveArrVal remove value from string array
+// RemoveArrVal 从字符串数组中移除指定值
+//
+// 参数:
+//
+//	arr: 字符串数组
+//	val: 待移除的值
+//
+// 返回:
+//
+//	[]string: 移除后的数组
 func RemoveArrVal(arr []string, val string) []string {
 	for k, v := range arr {
 		if v == val {
@@ -774,7 +1115,17 @@ func ExtendArrs(arrays ...*[]string) int {
 	return maxLength
 }
 
-// BytesToNum convert bytes to num
+// BytesToNum 将字节数组转换为数字
+// 每个字节转换为对应的数字后拼接
+// 示例：[1,2,3] -> 123
+//
+// 参数:
+//
+//	b: 字节数组
+//
+// 返回:
+//
+//	int: 转换后的数字
 func BytesToNum(b []byte) int {
 	var str string
 	for i := 0; i < len(b); i++ {
@@ -1031,7 +1382,16 @@ func EncodeIP(ip net.IP) []byte {
 	return buf
 }
 
-// DecodeIP decodes a [1-byte ATYP] + [16-byte Address] to net.IP
+// DecodeIP 解码IP地址
+// 解码格式：[1-byte ATYP] + [16-byte Address]
+//
+// 参数:
+//
+//	data: 17字节的编码数据
+//
+// 返回:
+//
+//	net.IP: IP地址对象
 func DecodeIP(data []byte) net.IP {
 	if len(data) < 17 {
 		return nil
@@ -1052,6 +1412,17 @@ func JoinHostPort(host string, port string) string {
 	return net.JoinHostPort(host, port)
 }
 
+// RandomBytes 生成随机字节数组
+// 长度随机范围为[0, maxLen]
+//
+// 参数:
+//
+//	maxLen: 最大长度
+//
+// 返回:
+//
+//	[]byte: 随机字节数组
+//	error: 错误信息
 func RandomBytes(maxLen int) ([]byte, error) {
 	nBig, err := rand.Int(rand.Reader, big.NewInt(int64(maxLen+1)))
 	if err != nil {
@@ -1065,6 +1436,15 @@ func RandomBytes(maxLen int) ([]byte, error) {
 	return buf, nil
 }
 
+// SetTimezone 设置时区
+//
+// 参数:
+//
+//	tz: 时区字符串（如："Asia/Shanghai"）
+//
+// 返回:
+//
+//	error: 错误信息
 func SetTimezone(tz string) error {
 	if tz == "" {
 		return nil
@@ -1109,12 +1489,23 @@ func CalibrateTimeOffset(server string) (time.Duration, error) {
 	return time.Until(ntpTime), nil
 }
 
+// TimeOffset 获取当前的时间偏移量
+//
+// 返回:
+//
+//	time.Duration: 时间偏移量
 func TimeOffset() time.Duration {
 	timeMutex.RLock()
 	defer timeMutex.RUnlock()
 	return timeOffset
 }
 
+// TimeNow 获取校准后的当前时间
+// 返回本地时间加上NTP校准的偏移量
+//
+// 返回:
+//
+//	time.Time: 校准后的时间
 func TimeNow() time.Time {
 	SyncTime()
 	timeMutex.RLock()
@@ -1122,6 +1513,9 @@ func TimeNow() time.Time {
 	return time.Now().Add(timeOffset)
 }
 
+// SyncTime 同步NTP时间
+// 定期与NTP服务器同步时间，计算并存储偏移量
+// 使用syncCh确保同一时间只有一个同步协程在运行
 func SyncTime() {
 	timeMutex.RLock()
 	srv, last := ntpServer, lastSyncMono
@@ -1158,18 +1552,47 @@ func SyncTime() {
 	}
 }
 
-// TimestampToBytes 8bit
+// TimestampToBytes 将时间戳转换为字节数组（大端序）
+// 8字节
+//
+// 参数:
+//
+//	ts: Unix时间戳
+//
+// 返回:
+//
+//	[]byte: 8字节的字节数组
 func TimestampToBytes(ts int64) []byte {
 	b := make([]byte, 8)
 	binary.BigEndian.PutUint64(b, uint64(ts))
 	return b
 }
 
-// BytesToTimestamp 8bit
+// BytesToTimestamp 将字节数组转换为时间戳（大端序）
+// 8字节
+//
+// 参数:
+//
+//	b: 8字节的字节数组
+//
+// 返回:
+//
+//	int64: Unix时间戳
 func BytesToTimestamp(b []byte) int64 {
 	return int64(binary.BigEndian.Uint64(b))
 }
 
+// ValidatePoW 验证工作量证明（Proof of Work）
+// 检查SHA256哈希的前bits位是否全为0
+//
+// 参数:
+//
+//	bits: 需要的零比特位数量（1-256）
+//	parts: 待验证的字符串片段
+//
+// 返回:
+//
+//	bool: true表示验证通过
 func ValidatePoW(bits int, parts ...string) bool {
 	if bits < 1 || bits > 256 {
 		return false
@@ -1193,6 +1616,22 @@ func ValidatePoW(bits int, parts ...string) bool {
 	return true
 }
 
+// IsTrustedProxy 检查IP是否为受信任的代理
+// 支持CIDR、通配符、精确匹配
+//
+// 参数:
+//
+//	list: 受信任的IP列表（逗号分隔）
+//	      支持格式：
+//	      - *: 全部信任
+//	      - 192.168.1.0/24: CIDR
+//	      - 192.168.*.*: 通配符
+//	      - 1.2.3.4: 精确IP
+//	ipStr: 待检查的IP地址
+//
+// 返回:
+//
+//	bool: true表示是受信任的代理
 func IsTrustedProxy(list, ipStr string) bool {
 	if list == "" || ipStr == "" {
 		return false

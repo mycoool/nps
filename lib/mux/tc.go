@@ -1,3 +1,5 @@
+// Package mux 提供流量控制和网络接口管理功能
+// 主要用于Linux系统的流量控制（tc命令）
 package mux
 
 import (
@@ -10,16 +12,26 @@ import (
 	"strings"
 )
 
+// Eth 网络接口信息
 type Eth struct {
-	EthName string
-	EthAddr string
+	EthName string // 接口名称（如eth0、ens33等）
+	EthAddr string // IP地址
 }
 
+// TrafficControl 流量控制器
+// 用于管理网络接口的流量限制
 type TrafficControl struct {
-	Eth    *Eth
-	params []string
+	Eth    *Eth     // 网络接口
+	params []string // 流控参数
 }
 
+// Ips 获取所有网络接口的IP地址
+// 遍历所有网络接口，排除回环接口（Loopback）和isatap接口
+//
+// 返回:
+//
+//	map[string]string: 接口名->IP地址的映射
+//	error: 错误信息
 func Ips() (map[string]string, error) {
 
 	ips := make(map[string]string)
@@ -44,7 +56,18 @@ func Ips() (map[string]string, error) {
 	return ips, nil
 }
 
-// GetEthByIp get ip and Eth information by Eth name
+// GetEthByIp 根据IP地址获取对应的网络接口信息
+// 遍历所有网络接口，查找匹配IP的接口
+// 排除：Loopback、isatap、lo等特殊接口
+//
+// 参数:
+//
+//	ipAddr: IP地址
+//
+// 返回:
+//
+//	*Eth: 网络接口信息，未找到返回nil
+//	error: 错误信息
 func GetEthByIp(ipAddr string) (eth *Eth, err error) {
 	var interfaces []net.Interface
 	interfaces, err = net.Interfaces()
@@ -77,8 +100,20 @@ func GetEthByIp(ipAddr string) (eth *Eth, err error) {
 	return
 }
 
+// tcFunc 流量控制函数类型
 type tcFunc func()
 
+// getArrayExhaustivity 生成数组元素的所有非空子集
+// 返回长度为2^n-1的二维数组，包含所有可能的函数组合
+// 用于流量控制的穷举测试
+//
+// 参数:
+//
+//	arr: tcFunc数组
+//
+// 返回:
+//
+//	[][]tcFunc: 所有非空子集的集合
 func getArrayExhaustivity(arr []tcFunc) (result [][]tcFunc) {
 	var l = int(math.Pow(float64(2), float64(len(arr))) - 1)
 	var t []tcFunc
@@ -96,6 +131,17 @@ func getArrayExhaustivity(arr []tcFunc) (result [][]tcFunc) {
 	return
 }
 
+// NewTrafficControl 创建流量控制器
+// 根据IP地址找到对应的网络接口，并初始化流量控制
+//
+// 参数:
+//
+//	ipAddr: IP地址
+//
+// 返回:
+//
+//	*TrafficControl: 流量控制器
+//	error: 错误信息
 func NewTrafficControl(ipAddr string) (*TrafficControl, error) {
 	Eth, err := GetEthByIp(ipAddr)
 	if err != nil {
