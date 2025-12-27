@@ -291,7 +291,8 @@ func GetSni(host string) string {
 	return sni
 }
 
-// GetHostByName Get the corresponding IP address through domain name
+// GetHostByName 通过域名获取对应的 IP 地址（优先返回 IPv4，其次 IPv6）。
+// 如果入参不是合法域名则原样返回。
 func GetHostByName(hostname string) string {
 	if !DomainCheck(hostname) {
 		return hostname
@@ -309,7 +310,7 @@ func GetHostByName(hostname string) string {
 	return ""
 }
 
-// DomainCheck Check the legality of domain
+// DomainCheck 检查字符串是否为合法域名（可带 http/https 前缀，可带路径）。
 func DomainCheck(domain string) bool {
 	var match bool
 	IsLine := "^((http://)|(https://))?([a-zA-Z0-9]([a-zA-Z0-9\\-]{0,61}[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,6}(/)"
@@ -321,6 +322,7 @@ func DomainCheck(domain string) bool {
 	return match
 }
 
+// Max 返回一组整数中的最大值；values 为空时返回 math.MinInt。
 func Max(values ...int) int {
 	maxVal := math.MinInt
 	for _, v := range values {
@@ -331,6 +333,7 @@ func Max(values ...int) int {
 	return maxVal
 }
 
+// Min 返回一组整数中的最小值；values 为空时返回 math.MaxInt。
 func Min(values ...int) int {
 	minVal := math.MaxInt
 	for _, v := range values {
@@ -341,6 +344,7 @@ func Min(values ...int) int {
 	return minVal
 }
 
+// GetPort 将任意整数归一化为 [0, 65535] 范围内的端口值。
 func GetPort(value int) int {
 	if value >= 0 {
 		return value % 65536
@@ -395,7 +399,7 @@ func CheckAuthWithAccountMap(u, p, user, passwd string, accountMap, authMap map[
 	return false
 }
 
-// CheckAuth Check if the Request request is validated
+// CheckAuth 校验 HTTP Basic 认证（Authorization/Proxy-Authorization）。
 func CheckAuth(r *http.Request, user, passwd string, accountMap, authMap map[string]string) bool {
 	// Bypass authentication only if user, passwd are empty and multiAccount is nil or empty
 	if user == "" && passwd == "" && len(accountMap) == 0 && len(authMap) == 0 {
@@ -697,7 +701,7 @@ func GetCertType(s string) string {
 	return "invalid"
 }
 
-// FileExists reports whether the named file or directory exists.
+// FileExists 判断文件或目录是否存在。
 func FileExists(name string) bool {
 	if _, err := os.Stat(name); err != nil {
 		if os.IsNotExist(err) {
@@ -707,7 +711,7 @@ func FileExists(name string) bool {
 	return true
 }
 
-// TestTcpPort Judge whether the TCP port can open normally
+// TestTcpPort 检查指定 TCP 端口是否可监听。
 func TestTcpPort(port int) bool {
 	l, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.ParseIP("0.0.0.0"), Port: port})
 	defer func() {
@@ -721,7 +725,7 @@ func TestTcpPort(port int) bool {
 	return true
 }
 
-// TestUdpPort Judge whether the UDP port can open normally
+// TestUdpPort 检查指定 UDP 端口是否可监听。
 func TestUdpPort(port int) bool {
 	l, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("0.0.0.0"), Port: port})
 	defer func() {
@@ -857,19 +861,19 @@ func GetPorts(s string) []int {
 	return ps
 }
 
-// IsPort is the string a port
+// IsPort 判断字符串是否为合法端口（1-65535）。
 func IsPort(p string) bool {
 	pi, err := strconv.Atoi(p)
 	if err != nil {
 		return false
 	}
-	if pi > 65536 || pi < 1 {
+	if pi > 65535 || pi < 1 {
 		return false
 	}
 	return true
 }
 
-// FormatAddress if the s is just a port,return 127.0.0.1:s
+// FormatAddress 规范化地址：如果仅提供端口，则补全为 127.0.0.1:port。
 func FormatAddress(s string) string {
 	if strings.Contains(s, ":") {
 		return s
@@ -964,6 +968,7 @@ func GetLocalUdpAddr() (net.Conn, error) {
 	return tmpConn, tmpConn.Close()
 }
 
+// GetLocalUdp4Addr 获取本地 IPv4 UDP 地址（通过外部 UDP 连接探测），连接会立即关闭。
 func GetLocalUdp4Addr() (net.Conn, error) {
 	tmpConn, err := net.Dial("udp4", "8.8.8.8:53")
 	if err != nil {
@@ -972,6 +977,7 @@ func GetLocalUdp4Addr() (net.Conn, error) {
 	return tmpConn, tmpConn.Close()
 }
 
+// GetLocalUdp6Addr 获取本地 IPv6 UDP 地址（通过外部 UDP 连接探测），连接会立即关闭。
 func GetLocalUdp6Addr() (net.Conn, error) {
 	tmpConn, err := net.Dial("udp6", "[2400:3200::1]:53")
 	if err != nil {
@@ -1021,7 +1027,7 @@ func GetEnvMap() map[string]string {
 	return m
 }
 
-// TrimArr throw the empty element of the string array
+// TrimArr 去掉字符串数组中的空元素（会 TrimSpace）。
 func TrimArr(arr []string) []string {
 	newArr := make([]string, 0)
 	for _, v := range arr {
@@ -1075,6 +1081,7 @@ func RemoveArrVal(arr []string, val string) []string {
 	return arr
 }
 
+// HandleArrEmptyVal 清理数组尾部空值，并将中间的空值继承为上一个非空值。
 func HandleArrEmptyVal(list []string) []string {
 	for len(list) > 0 && (list[len(list)-1] == "" || strings.TrimSpace(list[len(list)-1]) == "") {
 		list = list[:len(list)-1]
@@ -1090,6 +1097,7 @@ func HandleArrEmptyVal(list []string) []string {
 	return list
 }
 
+// ExtendArrs 将多个字符串数组扩展到相同长度，缺失项使用最后一个值填充（空数组填充空字符串）。
 func ExtendArrs(arrays ...*[]string) int {
 	maxLength := 0
 	for _, arr := range arrays {
@@ -1135,7 +1143,7 @@ func BytesToNum(b []byte) int {
 	return x
 }
 
-// GetSyncMapLen get the length of the sync map
+// GetSyncMapLen 获取 sync.Map 的元素数量（通过 Range 统计）。
 func GetSyncMapLen(m *sync.Map) int {
 	var c int
 	m.Range(func(key, value interface{}) bool {
@@ -1145,6 +1153,7 @@ func GetSyncMapLen(m *sync.Map) int {
 	return c
 }
 
+// GetExtFromPath 从路径中提取第一个 '.' 前的有效段（历史兼容：这不是标准“扩展名”提取）。
 func GetExtFromPath(path string) string {
 	s := strings.Split(path, ".")
 	re, err := regexp.Compile(`(\w+)`)
@@ -1154,6 +1163,7 @@ func GetExtFromPath(path string) string {
 	return string(re.Find([]byte(s[0])))
 }
 
+// NormalizeIP 将 IP 规范化为 4 字节 IPv4 或 16 字节 IPv6 表示。
 func NormalizeIP(ip net.IP) net.IP {
 	if ip == nil {
 		return nil
@@ -1164,6 +1174,7 @@ func NormalizeIP(ip net.IP) net.IP {
 	return ip.To16()
 }
 
+// IsZeroIP 判断是否为零值 IP（0.0.0.0 / ::）。
 func IsZeroIP(ip net.IP) bool {
 	if ip == nil {
 		return true
@@ -1171,6 +1182,7 @@ func IsZeroIP(ip net.IP) bool {
 	return ip.Equal(net.IPv4zero) || ip.Equal(net.IPv6zero)
 }
 
+// BuildUdpBindAddr 根据 serverIP/clientIP 推导 UDP 绑定网络类型与地址。
 func BuildUdpBindAddr(serverIP string, clientIP net.IP) (network string, addr *net.UDPAddr) {
 	if ip := net.ParseIP(serverIP); ip != nil && !IsZeroIP(ip) {
 		if ip.To4() != nil {
@@ -1187,6 +1199,7 @@ func BuildUdpBindAddr(serverIP string, clientIP net.IP) (network string, addr *n
 	return "udp", &net.UDPAddr{IP: nil, Port: 0}
 }
 
+// IsSameIPType 判断两个地址字符串是否同为 IPv6（通过是否包含 '[' 粗略判断）。
 func IsSameIPType(addr1, addr2 string) bool {
 	ip1 := strings.Contains(addr1, "[")
 	ip2 := strings.Contains(addr2, "[")
@@ -1197,6 +1210,7 @@ func IsSameIPType(addr1, addr2 string) bool {
 	return false
 }
 
+// GetMatchingLocalAddr 根据 remoteAddr 的 IP 类型（v4/v6）生成匹配的 localAddr。
 func GetMatchingLocalAddr(remoteAddr, localAddr string) (string, error) {
 	remoteIsV6 := strings.Contains(remoteAddr, "]:")
 	localIsV6 := strings.Contains(localAddr, "]:")
@@ -1235,6 +1249,7 @@ var ipApis = []string{
 	"https://d-jy.net/ip",
 }
 
+// FetchExternalIp 通过多个公网 API 获取外网 IP，并缓存到包变量中。
 func FetchExternalIp() string {
 	for _, api := range ipApis {
 		resp, err := http.Get(api)
@@ -1253,6 +1268,7 @@ func FetchExternalIp() string {
 	return ""
 }
 
+// GetExternalIp 获取缓存的外网 IP，若不存在则实时探测。
 func GetExternalIp() string {
 	if externalIp != "" {
 		return externalIp
@@ -1260,6 +1276,7 @@ func GetExternalIp() string {
 	return FetchExternalIp()
 }
 
+// PickEgressIPFor 选择连接到 dstIP 时的本机出站 IP（通过 UDP Dial 探测）。
 func PickEgressIPFor(dstIP net.IP) net.IP {
 	if dstIP == nil {
 		return nil
@@ -1281,6 +1298,7 @@ func PickEgressIPFor(dstIP net.IP) net.IP {
 	return nil
 }
 
+// GetIntranetIp 获取本机内网 IP（非回环地址），失败返回 127.0.0.1。
 func GetIntranetIp() string {
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
@@ -1297,6 +1315,7 @@ func GetIntranetIp() string {
 	return "127.0.0.1"
 }
 
+// GetOutboundIP 获取默认出站 IP（通过 UDP 连接探测），失败返回 127.0.0.1。
 func GetOutboundIP() net.IP {
 	conn, err := net.Dial("udp", GetCustomDNS())
 	if err != nil {
@@ -1308,6 +1327,7 @@ func GetOutboundIP() net.IP {
 	return localAddr.IP
 }
 
+// GetOutboundIPv6 获取默认出站 IPv6（通过 UDP 连接探测），失败返回 nil。
 func GetOutboundIPv6() net.IP {
 	tmpConn, err := GetLocalUdp6Addr()
 	if err == nil {
@@ -1316,11 +1336,13 @@ func GetOutboundIPv6() net.IP {
 	return nil
 }
 
+// IsValidIP 判断字符串是否为合法 IP（IPv4/IPv6）。
 func IsValidIP(ip string) bool {
 	parsedIP := net.ParseIP(ip)
 	return parsedIP != nil
 }
 
+// IsPublicIP 判断 IP 是否为公网地址（排除 loopback、link-local、RFC1918、IPv6 私有地址）。
 func IsPublicIP(IP net.IP) bool {
 	if IP.IsLoopback() || IP.IsLinkLocalMulticast() || IP.IsLinkLocalUnicast() {
 		return false
@@ -1347,6 +1369,7 @@ func IsPublicIP(IP net.IP) bool {
 	return false
 }
 
+// GetServerIp 获取服务端对外可用 IP：优先使用配置的 ip（非 0.0.0.0/::），否则根据本机出站地址推导。
 func GetServerIp(ip string) string {
 	if ip != "" && ip != "0.0.0.0" && ip != "::" {
 		return ip
@@ -1362,6 +1385,7 @@ func GetServerIp(ip string) string {
 	return GetOutboundIP().String()
 }
 
+// GetServerIpByClientIp 根据客户端 IP 类型选择返回外网 IP 或内网 IP。
 func GetServerIpByClientIp(clientIp net.IP) string {
 	if IsPublicIP(clientIp) {
 		return GetExternalIp()
@@ -1408,6 +1432,7 @@ func DecodeIP(data []byte) net.IP {
 	}
 }
 
+// JoinHostPort 等价于 net.JoinHostPort。
 func JoinHostPort(host string, port string) string {
 	return net.JoinHostPort(host, port)
 }
@@ -1466,18 +1491,21 @@ var (
 	syncCh       = make(chan struct{}, 1)
 )
 
+// SetNtpServer 设置 NTP 服务器地址（空字符串表示关闭 NTP 校准）。
 func SetNtpServer(server string) {
 	timeMutex.Lock()
 	defer timeMutex.Unlock()
 	ntpServer = server
 }
 
+// SetNtpInterval 设置 NTP 同步间隔。
 func SetNtpInterval(d time.Duration) {
 	timeMutex.Lock()
 	defer timeMutex.Unlock()
 	syncInterval = d
 }
 
+// CalibrateTimeOffset 与 NTP 服务器校准时间并返回偏移量。
 func CalibrateTimeOffset(server string) (time.Duration, error) {
 	if server == "" {
 		return 0, nil
